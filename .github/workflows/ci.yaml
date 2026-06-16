@@ -1,0 +1,220 @@
+name: CI - Build & Publish
+
+on:
+  workflow_call:
+    inputs:
+      force_build:
+        description: 'Force build of both images regardless of detected changes'
+        type: boolean
+        default: false
+        required: false
+    outputs:
+      image_tag:
+        description: Image tag (semantic version) pushed to the registry
+        value: ${{ jobs.version.outputs.version }}
+      version:
+        description: Semantic version computed from Conventional Commits
+        value: ${{ jobs.version.outputs.version }}
+      backend_changed:
+        description: Whether backend source files changed
+        value: ${{ jobs.detect.outputs.backend_changed }}
+      frontend_changed:
+        description: Whether frontend source files changed
+        value: ${{ jobs.detect.outputs.frontend_changed }}
+
+env:
+  REGISTRY: registry.uday.corp:5000
+  BACKEND_IMAGE: backstage-backend
+  FRONTEND_IMAGE: backstage-frontend
+  PROJECT_DIR: developer-portal
+
+jobs:
+  version:
+    name: Compute semantic version
+    runs-on: [self-hosted, linux, kubernetes]
+    outputs:
+      version: ${{ steps.semver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: semver
+        shell: bash
+        run: |
+          LATEST=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1) || true
+          LATEST="${LATEST:-v0.0.0}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST#v}"
+
+          if [[ "$LATEST" == 'v0.0.0' ]]; then
+            COMMITS=$(git log --pretty=format:"%s")
+          else
+            COMMITS=$(git log "${LATEST}..HEAD" --pretty=format:"%s")
+          fi
+
+          if echo "$COMMITS" | grep -qE '^(feat|fix|refactor|perf)!:|BREAKING CHANGE'; then
+            MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0
+          elif echo "$COMMITS" | grep -qE '^feat(\(.+\))?:'; then
+            MINOR=$((MINOR+1)); PATCH=0
+          else
+            PATCH=$((PATCH+1))
+          fi
+
+          echo "version=v${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+
+  detect:
+    name: Detect changes
+    runs-on: [self-hosted, linux, kubernetes]
+    outputs:
+      backend_changed:  ${{ steps.changes.outputs.backend_changed }}
+      frontend_changed: ${{ steps.changes.outputs.frontend_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: changes
+        shell: bash
+        run: |
+          if [[ "${{ inputs.force_build }}" == 'true' ]]; then
+            echo 'backend_changed=true'  >> "$GITHUB_OUTPUT"
+            echo 'frontend_changed=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE='${{ github.event.before }}'
+          HEAD='${{ github.sha }}'
+          ZERO='0000000000000000000000000000000000000000'
+
+          if [[ "$BASE" == "$ZERO" ]]; then
+            echo 'backend_changed=true'  >> "$GITHUB_OUTPUT"
+            echo 'frontend_changed=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          [[ "$BASE" == "$HEAD" ]] \
+            && DIFF=$(git diff --name-only HEAD^ HEAD) \
+            || DIFF=$(git diff --name-only "$BASE" "$HEAD")
+
+          echo "$DIFF"
+
+          # Shared files that affect both images (yarn.lock, root package.json)
+          SHARED_CHANGED=false
+          if echo "$DIFF" | grep -qE '^developer-portal/(yarn\.lock|package\.json)$'; then
+            SHARED_CHANGED=true
+          fi
+
+          if [[ "$SHARED_CHANGED" == 'true' ]] || echo "$DIFF" | grep -q 'developer-portal/packages/backend/'; then
+            echo 'backend_changed=true'  >> "$GITHUB_OUTPUT"
+          else
+            echo 'backend_changed=false' >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ "$SHARED_CHANGED" == 'true' ]] || echo "$DIFF" | grep -qE 'developer-portal/packages/app/|developer-portal/app-config'; then
+            echo 'frontend_changed=true'  >> "$GITHUB_OUTPUT"
+          else
+            echo 'frontend_changed=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  build_backend:
+    name: Build backend image
+    runs-on: [self-hosted, linux, kubernetes]
+    needs: [version, detect]
+    if: needs.detect.outputs.backend_changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Yarn from local binary
+        shell: bash
+        run: |
+          printf '#!/bin/sh\nexec node "%s/${{ env.PROJECT_DIR }}/.yarn/releases/yarn-4.4.1.cjs" "$@"\n' \
+            "$GITHUB_WORKSPACE" > "$RUNNER_TEMP/yarn"
+          chmod +x "$RUNNER_TEMP/yarn"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          yarn install --immutable
+          yarn tsc
+          yarn build:backend
+
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+
+      - shell: bash
+        env:
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          [[ -n "$NEXUS_USERNAME" && -n "$NEXUS_PASSWORD" ]] || { echo 'Credenciais ausentes'; exit 1; }
+          echo "$NEXUS_PASSWORD" | docker login "${{ env.REGISTRY }}" -u "$NEXUS_USERNAME" --password-stdin
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./developer-portal
+          file: ./developer-portal/packages/backend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            NEXUS_APT_URL=${{ secrets.NEXUS_APT_URL }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ needs.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
+
+  build_frontend:
+    name: Build frontend image
+    runs-on: [self-hosted, linux, kubernetes]
+    needs: [version, detect]
+    if: needs.detect.outputs.frontend_changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Yarn from local binary
+        shell: bash
+        run: |
+          printf '#!/bin/sh\nexec node "%s/${{ env.PROJECT_DIR }}/.yarn/releases/yarn-4.4.1.cjs" "$@"\n' \
+            "$GITHUB_WORKSPACE" > "$RUNNER_TEMP/yarn"
+          chmod +x "$RUNNER_TEMP/yarn"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          yarn install --immutable
+          yarn tsc
+          APP_CONFIG_DIR="${GITHUB_WORKSPACE}/${{ env.PROJECT_DIR }}"
+          yarn workspace app build \
+            --config "${APP_CONFIG_DIR}/app-config.yaml" \
+            --config "${APP_CONFIG_DIR}/app-config.production.yaml"
+
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+
+      - shell: bash
+        env:
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          [[ -n "$NEXUS_USERNAME" && -n "$NEXUS_PASSWORD" ]] || { echo 'Credenciais ausentes'; exit 1; }
+          echo "$NEXUS_PASSWORD" | docker login "${{ env.REGISTRY }}" -u "$NEXUS_USERNAME" --password-stdin
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./developer-portal
+          file: ./developer-portal/packages/app/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ needs.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest

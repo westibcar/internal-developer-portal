@@ -1,0 +1,80 @@
+imagePullSecrets: []
+
+namespace:
+  name: ""
+
+global:
+  baseUrl: ""
+
+ingress:
+  enabled: false
+  host: ""
+
+istio:
+  enabled: false
+  host: ""
+  gateway:
+    namespace: istio-system
+    selector:
+      istio: ingressgateway
+    tls:
+      enabled: false
+      credentialName: ""
+  destinationRule:
+    enabled: false
+
+backend:
+  replicaCount: 1
+  image:
+    repository: registry.uday.corp:5000/backstage-backend
+    tag: latest
+    pullPolicy: Always
+  service:
+    port: 7007
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: registry.uday.corp:5000/backstage-frontend
+    tag: latest
+    pullPolicy: Always
+  service:
+    port: 80
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  port: 5432
+  auth:
+    username: backstage
+    password: ""
+    database: backstage
+    existingSecret: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  persistence:
+    enabled: true
+    size: 2Gi
+    storageClassName: longhorn

@@ -1,0 +1,29 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "backstage.fullname" . }}
+  namespace: {{ include "backstage.namespace" . }}
+spec:
+  hosts:
+    - {{ .Values.istio.host | quote }}
+  gateways:
+    - {{ printf "%s/%s" .Values.istio.gateway.namespace (include "backstage.fullname" .) | quote }}
+  http:
+    - match:
+        - uri:
+            prefix: /api
+      route:
+        - destination:
+            host: {{ include "backstage.fullname" . }}-backend.{{ include "backstage.namespace" . }}.svc.cluster.local
+            port:
+              number: {{ .Values.backend.service.port }}
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: {{ include "backstage.fullname" . }}-frontend.{{ include "backstage.namespace" . }}.svc.cluster.local
+            port:
+              number: {{ .Values.frontend.service.port }}
+{{- end }}

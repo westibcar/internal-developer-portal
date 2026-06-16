@@ -1,0 +1,117 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: fastapi-service-template
+  title: FastAPI Service Template
+  description: Gera um servico FastAPI inicial com base no padrao da equipe
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Dados do servico
+      required:
+        - appName
+        - owner
+        - repoUrl
+        - namespace
+      properties:
+        appName:
+          title: Nome da aplicacao
+          type: string
+          description: Use kebab-case, por exemplo meu-servico
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          ui:autofocus: true
+        description:
+          title: Descricao
+          type: string
+          default: Servico FastAPI criado via Backstage Scaffolder
+        owner:
+          title: Owner
+          type: string
+          description: Entidade dona no Catalog, por exemplo group:default/platform
+          ui:field: OwnerPicker
+          ui:options:
+            allowedKinds:
+              - Group
+              - User
+        namespace:
+          title: Namespace Kubernetes
+          type: string
+          description: Namespace de deploy da aplicacao
+          pattern: '^[a-z0-9-]+$'
+          default: default
+
+    - title: Dados de infraestrutura
+      required:
+        - backendPort
+        - frontendPort
+        - databaseName
+      properties:
+        backendPort:
+          title: Porta do backend
+          type: integer
+          default: 8000
+          minimum: 1
+          maximum: 65535
+        frontendPort:
+          title: Porta do frontend
+          type: integer
+          default: 80
+          minimum: 1
+          maximum: 65535
+        databaseName:
+          title: Nome do banco
+          type: string
+          default: appdb
+          pattern: '^[a-zA-Z_][a-zA-Z0-9_]*$'
+
+    - title: Repositorio de destino
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Local do repositorio
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+
+  steps:
+    - id: fetch-base
+      name: Gerar arquivos base
+      action: fetch:template
+      input:
+        url: ./content
+        values:
+          appName: ${{ parameters.appName }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          namespace: ${{ parameters.namespace }}
+          backendPort: ${{ parameters.backendPort }}
+          frontendPort: ${{ parameters.frontendPort }}
+          databaseName: ${{ parameters.databaseName }}
+
+    - id: publish
+      name: Publicar no GitHub
+      action: publish:github
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        description: ${{ parameters.description }}
+        defaultBranch: main
+
+    - id: register
+      name: Registrar no Catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  output:
+    links:
+      - title: Repositorio
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: Componente no Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}

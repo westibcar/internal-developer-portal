@@ -1,0 +1,23 @@
+{{- if and .Values.istio.enabled .Values.istio.destinationRule.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "backstage.fullname" . }}-backend
+  namespace: {{ include "backstage.namespace" . }}
+spec:
+  host: {{ include "backstage.fullname" . }}-backend.{{ include "backstage.namespace" . }}.svc.cluster.local
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "backstage.fullname" . }}-frontend
+  namespace: {{ include "backstage.namespace" . }}
+spec:
+  host: {{ include "backstage.fullname" . }}-frontend.{{ include "backstage.namespace" . }}.svc.cluster.local
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+{{- end }}

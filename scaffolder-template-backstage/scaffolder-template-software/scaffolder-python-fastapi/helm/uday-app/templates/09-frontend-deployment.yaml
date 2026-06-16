@@ -1,0 +1,96 @@
+# Service para Frontend (ClusterIP para acesso interno)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.frontend.service.name }}
+  namespace: {{ include "uday-app.namespace" . }}
+  labels:
+    app: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.frontend.service.port }}
+      targetPort: {{ .Values.frontend.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: frontend
+
+---
+# Deployment para Frontend (Nginx)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: {{ include "uday-app.namespace" . }}
+  labels:
+    app: frontend
+spec:
+  replicas: {{ .Values.frontend.replicas }}  
+  selector:
+    matchLabels:
+      app: frontend
+  
+  # Estratégia de atualização
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  template:
+    metadata:
+      labels:
+        app: frontend
+        version: v1
+    spec:
+      # Service Account com acesso ao registry privado
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      
+      containers:
+      - name: frontend
+        image: {{ .Values.frontend.image }}
+        imagePullPolicy: Always
+        
+        ports:
+        - containerPort: {{ .Values.frontend.service.port }}
+          name: http
+          protocol: TCP
+        
+        # Variável de ambiente para o host do backend
+        env:
+        - name: BACKEND_HOST
+          value: {{ include "uday-app.frontendBackendHost" . | quote }}
+        
+        # Resources
+        resources:
+          requests:
+            memory: {{ .Values.frontend.resources.requests.memory | quote }}
+            cpu: {{ .Values.frontend.resources.requests.cpu | quote }}
+          limits:
+            memory: {{ .Values.frontend.resources.limits.memory | quote }}
+            cpu: {{ .Values.frontend.resources.limits.cpu | quote }}
+        
+        # Liveness Probe
+        livenessProbe:
+          httpGet:
+            path: /
+            port: {{ .Values.frontend.service.port }}
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness Probe
+        readinessProbe:
+          httpGet:
+            path: /
+            port: {{ .Values.frontend.service.port }}
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      
+      restartPolicy: Always

@@ -1,0 +1,28 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ include "backstage.fullname" . }}
+  namespace: {{ .Values.istio.gateway.namespace }}
+spec:
+  selector:
+    {{- toYaml .Values.istio.gateway.selector | nindent 4 }}
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - {{ .Values.istio.host | quote }}
+{{- if .Values.istio.gateway.tls.enabled }}
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        credentialName: {{ .Values.istio.gateway.tls.credentialName | quote }}
+      hosts:
+        - {{ .Values.istio.host | quote }}
+{{- end }}
+{{- end }}

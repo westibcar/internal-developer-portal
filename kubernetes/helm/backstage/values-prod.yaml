@@ -1,0 +1,32 @@
+fullnameOverride: backstage
+
+namespace:
+  name: backstage
+
+global:
+  baseUrl: https://developer-portal.uday.corp
+
+istio:
+  enabled: true
+  host: developer-portal.uday.corp
+  gateway:
+    tls:
+      enabled: true
+      credentialName: developer-portal-uday-corp-tls
+
+postgres:
+  auth:
+    database: backstage_prod
+    existingSecret: backstage-postgres-secret
+  persistence:
+    storageClassName: longhorn
+
+backend:
+  image:
+    tag: 20260607-2
+
+frontend:
+  image:
+    tag: 20260607-5
+  nodeSelector:
+    kubernetes.io/hostname: worker01

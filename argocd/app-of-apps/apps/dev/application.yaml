@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: backstage-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: backstage-dev
+    app.kubernetes.io/part-of: backstage
+    environment: dev
+spec:
+  project: backstage
+  source:
+    repoURL: https://github.com/westibcar/internal-developer-portal.git
+    targetRevision: develop
+    path: kubernetes/helm/backstage
+    helm:
+      releaseName: backstage-dev
+      valueFiles:
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: backstage-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

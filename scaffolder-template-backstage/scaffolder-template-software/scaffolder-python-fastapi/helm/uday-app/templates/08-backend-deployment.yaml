@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.backend.service.name }}
+  namespace: {{ include "uday-app.namespace" . }}
+  labels:
+    app: backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.backend.service.port }}
+      targetPort: {{ .Values.backend.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: backend
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: {{ include "uday-app.namespace" . }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: backend
+        image: {{ .Values.backend.image }}
+        ports:
+        - containerPort: {{ .Values.backend.service.port }}
+        envFrom:
+        - configMapRef:
+            name: {{ .Values.configmap.backend.name }}
+        env:
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.backend.name }}
+              key: SECRET_KEY
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.backend.name }}
+              key: DATABASE_URL
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Iniciando FastAPI..."
+          exec uvicorn app.main:app --host 0.0.0.0 --port {{ .Values.backend.service.port }}
+        resources:
+          requests:
+            cpu: {{ .Values.backend.resources.requests.cpu | quote }}
+            memory: {{ .Values.backend.resources.requests.memory | quote }}
+          limits:
+            cpu: {{ .Values.backend.resources.limits.cpu | quote }}
+            memory: {{ .Values.backend.resources.limits.memory | quote }}
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sh", "-c", "sleep 10"]
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.backend.service.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.backend.service.port }}
+          initialDelaySeconds: 15
+          periodSeconds: 5

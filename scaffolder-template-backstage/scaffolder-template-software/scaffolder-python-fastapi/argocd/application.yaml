@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: uday-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/westibcar/DevOps.git
+    targetRevision: main
+    path: helm/uday-app
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: uday-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      

@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: backstage
+  namespace: argocd
+spec:
+  description: Projeto GitOps do Backstage (dev, hml, prod)
+  sourceRepos:
+    - https://github.com/westibcar/internal-developer-portal.git
+  destinations:
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+    - namespace: backstage-dev
+      server: https://kubernetes.default.svc
+    - namespace: backstage-hml
+      server: https://kubernetes.default.svc
+    - namespace: backstage
+      server: https://kubernetes.default.svc
+    - namespace: istio-system
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

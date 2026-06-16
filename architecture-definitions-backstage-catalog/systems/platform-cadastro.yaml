@@ -1,0 +1,7 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: platform-cadastro
+  description: Sistema responsável pelo cadastro de empresas Uday.
+spec:
+  owner: default/guests

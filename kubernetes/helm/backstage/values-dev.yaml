@@ -1,0 +1,25 @@
+imagePullSecrets:
+  - name: registry-credentials
+fullnameOverride: backstage-dev
+namespace:
+  name: backstage-dev
+global:
+  baseUrl: https://developer-portal-dev.uday.corp
+istio:
+  enabled: true
+  host: developer-portal-dev.uday.corp
+postgres:
+  auth:
+    username: backstage
+    password: backstage_dev_2024
+    database: backstage_dev
+  persistence:
+    storageClassName: longhorn
+backend:
+  image:
+    tag: v0.1.0
+frontend:
+  image:
+    tag: v0.1.0
+  nodeSelector:
+    kubernetes.io/hostname: worker01

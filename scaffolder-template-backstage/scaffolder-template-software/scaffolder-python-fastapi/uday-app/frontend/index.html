@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Empresarial</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Login Form -->
+        <div id="loginForm" class="form-container">
+            <h2>Login</h2>
+            <p style="color: #666; font-size: 14px;">Pipeline CI/CD funcionando! 🚀</p>
+            <form onsubmit="handleLogin(event)">
+                <input type="email" id="loginEmail" placeholder="Email" required>
+                <input type="password" id="loginPassword" placeholder="Senha" required>
+                <button type="submit">Entrar</button>
+            </form>
+            <p>Não tem uma conta? <a href="#" onclick="toggleForms()">Registre-se</a></p>
+        </div>
+
+        <!-- Register Form -->
+        <div id="registerForm" class="form-container hidden">
+            <h2>Registro</h2>
+            <form onsubmit="handleRegister(event)">
+                <input type="text" id="registerName" placeholder="Nome" required>
+                <input type="email" id="registerEmail" placeholder="Email" required>
+                <input type="password" id="registerPassword" placeholder="Senha" required>
+                <div class="gender-selection">
+                    <label>Gênero:</label>
+                    <div class="gender-options">
+                        <label>
+                            <input type="radio" name="gender" value="homem" checked>
+                            Homem
+                        </label>
+                        <label>
+                            <input type="radio" name="gender" value="mulher">
+                            Mulher
+                        </label>
+                    </div>
+                </div>
+                <input type="text" id="registerBio" placeholder="Bio">
+                <input type="text" id="registerProfession" placeholder="Profissão">
+                <input type="text" id="registerDepartment" placeholder="Departamento">
+                <button type="submit">Registrar</button>
+            </form>
+            <p>Já tem uma conta? <a href="#" onclick="toggleForms()">Faça login</a></p>
+        </div>
+
+        <!-- Main Content (hidden initially) -->
+        <div id="mainContent" class="hidden">
+            <div class="header">
+                <div class="user-info">
+                    <div class="user-profile">
+                        <img id="userPhoto" src="/uploads/default-avatar.png" alt="Foto do Perfil" class="profile-photo">
+                        <div class="user-details">
+                            <h2>Bem-vindo, <span id="userName"></span>!</h2>
+                            <button onclick="toggleProfileMenu()" class="profile-button">Editar Perfil</button>
+                        </div>
+                    </div>
+                    <button onclick="logout()" class="logout-button">Sair</button>
+                </div>
+            </div>
+
+            <!-- Profile Menu (hidden initially) -->
+            <div id="profileMenu" class="profile-menu hidden">
+                <div class="profile-form">
+                    <div class="profile-header">
+                        <h3>Editar Perfil</h3>
+                        <button type="button" class="close-button" onclick="toggleProfileMenu()">✕</button>
+                    </div>
+                    <form onsubmit="handleProfileUpdate(event)" class="profile-update-form">
+                        <div class="form-group">
+                            <label for="updateName">Nome:</label>
+                            <input type="text" id="updateName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="updateBio">Bio:</label>
+                            <textarea id="updateBio" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="updateProfession">Profissão:</label>
+                            <input type="text" id="updateProfession">
+                        </div>
+                        <div class="form-group">
+                            <label for="updateDepartment">Departamento:</label>
+                            <input type="text" id="updateDepartment">
+                        </div>
+                        <div class="form-group">
+                            <label for="profilePhoto">Foto de Perfil:</label>
+                            <input type="file" id="profilePhoto" accept="image/*" onchange="handlePhotoPreview(event)">
+                            <img id="photoPreview" class="photo-preview hidden" alt="Preview da foto">
+                        </div>
+                        <button type="submit" class="update-button">Atualizar Perfil</button>
+                        <button type="button" class="delete-profile-button" onclick="handleDeleteProfile()">Excluir Perfil</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Company Form -->
+            <div class="company-section">
+                <div class="company-form">
+                    <h3>Cadastrar Nova Empresa</h3>
+                    <form onsubmit="handleCompanySubmit(event)">
+                        <div class="form-group">
+                            <label for="companyName">Nome da Empresa:</label>
+                            <input type="text" id="companyName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="companyCNPJ">CNPJ:</label>
+                            <input type="text" id="companyCNPJ" required pattern="\d{14}" title="Digite apenas os números do CNPJ (14 dígitos)">
+                        </div>
+                        <button type="submit">Cadastrar Empresa</button>
+                    </form>
+                </div>
+
+                <div class="companies-container">
+                    <h3>Empresas Cadastradas</h3>
+                    <table id="companiesTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nome da Empresa</th>
+                                <th>CNPJ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="companiesTableBody">
+                            <!-- Empresas serão inseridas aqui via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

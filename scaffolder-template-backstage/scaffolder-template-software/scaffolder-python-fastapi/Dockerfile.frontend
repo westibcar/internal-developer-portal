@@ -1,0 +1,16 @@
+# Dockerfile para Frontend (HTML/CSS/JS) com Nginx
+# CI/CD Pipeline v3 - Teste E2E completo
+FROM nginx:alpine
+
+COPY uday-app/frontend /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf.template
+COPY entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
+
+# Expor a porta 8- usada pelo Nginx
+EXPOSE 80
+
+# Entrypoint
+ENTRYPOINT [ "/entrypoint.sh" ]
+

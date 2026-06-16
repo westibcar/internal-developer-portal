@@ -1,0 +1,98 @@
+namespace: uday-app
+
+registry:
+  dockercfg: eyJyZWdpc3RyeS51ZGF5LmNvcnA6NTAwMCI6eyJ1c2VybmFtZSI6ImRvY2tlcnVzZXIiLCJwYXNzd29yZCI6IjEyMzQ1IiwiZW1haWwiOiJjb250YXRvQHVkYXkuY29tLmJyIiwiYXV0aCI6IlpHeGxibU5oY0c5dElFUkJPa3c9In19
+
+serviceAccount:
+  name: deployer-sa
+
+secrets:
+  postgres:
+    name: postgres-secret
+    data:
+      POSTGRES_USER: dXNlcg==
+      POSTGRES_PASSWORD: c2VuaGExMjM=
+      POSTGRES_DB: YXBwZGI=
+  backend:
+    name: backend-secret
+    data:
+      SECRET_KEY: Y2hhdmVqd3RzZWNyZXRh
+      DATABASE_URL: cG9zdGdyZXNxbCtwc3ljb3BnMjovL3VzZXI6c2VuaGExMjNAcG9zdGdyZXMtc2VydmljZTo1NDMyL2FwcGRi
+
+configmap:
+  backend:
+    name: backend-config
+    data:
+      # Configurações JWT
+      JWT_ALGORITHM: "HS256"
+      JWT_EXPIRATION_TIME: "30"
+      # Configurações da aplicação
+      APP_NAME: "FastAPI Enterprise"
+      APP_VERSION: "1.0.0"
+      ENVIRONMENT: "kubernetes"
+      # Configurações de logging
+      LOG_LEVEL: "INFO"
+
+persistence:
+  storageClassName: longhorn
+  postgres:
+    name: postgres-pvc
+    size: 5Gi
+  uploads:
+    name: uploads-pvc
+    size: 2Gi
+
+postgres:
+  image: postgres:15
+  service:
+    name: postgres-service
+    port: 5432
+  replicas: 1
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+migrationsJob:
+  name: backend-migrations
+  image: registry.uday.corp:5000/uday-app/uday-backend:8c87802
+
+backend:
+  image: registry.uday.corp:5000/uday-app/uday-backend:8c87802
+  service:
+    name: backend-service
+    port: 8000
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+frontend:
+  image: registry.uday.corp:5000/uday-app/uday-frontend:4ac87c5
+  service:
+    name: frontend-service
+    port: 80
+  replicas: 1
+  backendHost: ""
+  resources:
+    requests:
+      memory: "32Mi"
+      cpu: "50m"
+    limits:
+      memory: "64Mi"
+      cpu: "100m"
+
+istioGateway:
+  name: uday-gateway
+  host: site.uday.corp
+
+virtualService:
+  name: uday-virtualservice
+  host: site.uday.corp

@@ -1,0 +1,21 @@
+# =============================================================================
+# Configuração do Docker daemon dentro do DinD
+# =============================================================================
+# Adiciona o registry privado como "insecure" (HTTP sem TLS)
+# para que o runner consiga fazer push das imagens.
+# =============================================================================
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: docker-daemon-config
+  namespace: github-runner
+data:
+  daemon.json: |
+    {
+      "insecure-registries": ["registry.uday.corp:5000"],
+      "features": {
+        "buildkit": true
+      }
+    }
+    

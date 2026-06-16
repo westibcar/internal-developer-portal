@@ -1,0 +1,135 @@
+# =============================================================================
+# CD - Continuous Delivery (Workflow Reutilizável)
+# =============================================================================
+# Responsabilidade:
+#   1. Atualizar as tags das imagens no Helm values.yaml
+#   2. Fazer commit e push para o repositório
+#   3. ArgoCD detecta a mudança e faz o deploy automaticamente
+#
+# Este workflow é chamado por ci-cd.yaml via workflow_call
+# =============================================================================
+
+name: CD - Deploy via Helm + ArgoCD
+
+on:
+  workflow_call:
+    inputs:
+      values_file:
+        description: "Caminho do values.yaml do Helm"
+        required: true
+        type: string
+      backend_changed:
+        description: "Se o backend foi alterado (true/false)"
+        required: true
+        type: string
+      frontend_changed:
+        description: "Se o frontend foi alterado (true/false)"
+        required: true
+        type: string
+      backend_image:
+        description: "Nome base da imagem do backend (sem tag)"
+        required: true
+        type: string
+      frontend_image:
+        description: "Nome base da imagem do frontend (sem tag)"
+        required: true
+        type: string
+      image_tag:
+        description: "Tag da nova imagem"
+        required: true
+        type: string
+    secrets:
+      token:
+        description: "Token para push no repositório"
+        required: true
+
+jobs:
+# =============================================================================
+# Job: Atualizar Helm values.yaml com as novas tags
+# =============================================================================
+  update-helm:
+    name: "Atualizar Helm Values"
+    runs-on: self-hosted
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.token }}
+
+      - name: Atualizar tags das imagens no values.yaml
+        run: |
+          TAG="${{ inputs.image_tag }}"
+          VALUES_FILE="${{ inputs.values_file }}"
+          BACKEND_IMAGE="${{ inputs.backend_image }}"
+          FRONTEND_IMAGE="${{ inputs.frontend_image }}"
+
+          echo "========================================="
+          echo "Atualizando Helm values.yaml..."
+          echo "  Nova tag: $TAG"
+          echo "========================================="
+
+          # Atualiza a imagem do backend (inclui migrationsJob que usa a mesma imagem)
+          if [ "${{ inputs.backend_changed }}" == "true" ]; then
+            echo "  Atualizando imagem do backend para tag: $TAG"
+            sed -i "s|image: ${BACKEND_IMAGE}:.*|image: ${BACKEND_IMAGE}:${TAG}|g" "$VALUES_FILE"
+          fi
+
+          # Atualiza a imagem do frontend
+          if [ "${{ inputs.frontend_changed }}" == "true" ]; then
+            echo "  Atualizando imagem do frontend para tag: $TAG"
+            sed -i "s|image: ${FRONTEND_IMAGE}:.*|image: ${FRONTEND_IMAGE}:${TAG}|g" "$VALUES_FILE"
+          fi
+
+          echo ""
+          echo "values.yaml atualizado:"
+          echo "========================================="
+          cat "$VALUES_FILE"
+          echo "========================================="
+
+      - name: Commit e push das alterações do Helm
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add "${{ inputs.values_file }}"
+
+          if git diff --staged --quiet; then
+            echo "Nenhuma alteração no values.yaml para commitar."
+          else
+            git commit -m "cd: atualizar image tags [skip ci]
+
+          Backend alterado: ${{ inputs.backend_changed }}
+          Frontend alterado: ${{ inputs.frontend_changed }}
+          Tag: ${{ inputs.image_tag }}"
+
+            git push
+            echo "Helm values.yaml atualizado e enviado ao repositório."
+          fi
+
+      # =====================================================================
+      # Garantir que a Application do ArgoCD existe
+      # Se não existir, cria automaticamente a partir do manifest no repo
+      # Se já existir, o apply é idempotente (não faz nada)
+      # =====================================================================
+      - name: Garantir Application no ArgoCD
+        run: |
+          export PATH="/home/runner/bin:$PATH"
+
+          echo "========================================="
+          echo "Verificando Application no ArgoCD..."
+          echo "========================================="
+
+          if kubectl get application uday-app -n argocd >/dev/null 2>&1; then
+            echo "✔ Application 'uday-app' já existe no ArgoCD."
+          else
+            echo "Application 'uday-app' não encontrada. Criando..."
+            kubectl apply -f argocd/application.yaml
+            echo "✔ Application 'uday-app' criada no ArgoCD."
+          fi
+
+          echo ""
+          echo "Status da Application:"
+          kubectl get application uday-app -n argocd -o wide
+          echo "========================================="
+          echo "ArgoCD irá detectar a mudança e realizar o deploy automaticamente."
+          

@@ -1,0 +1,15 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "backstage.fullname" . }}-postgres
+  namespace: {{ include "backstage.namespace" . }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ include "backstage.fullname" . }}-postgres
+  ports:
+    - name: postgres
+      port: {{ .Values.postgres.port }}
+      targetPort: postgres
+{{- end }}

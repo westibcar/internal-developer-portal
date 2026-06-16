@@ -1,0 +1,394 @@
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --background-color: #ecf0f1;
+    --text-color: #2c3e50;
+    --error-color: #e74c3c;
+    --success-color: #27ae60;
+    --excel-header-bg: #217346;
+    --excel-header-text: #ffffff;
+    --excel-border: #d4d4d4;
+    --excel-alt-row: #f3f3f3;
+    --excel-hover: #e6f3ff;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Forms */
+.form-container {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    margin: 2rem auto;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+input:not([type="radio"]), textarea {
+    padding: 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    width: 100%;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.gender-selection {
+    margin-bottom: 1rem;
+}
+
+.gender-selection label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+}
+
+.gender-options {
+    display: flex;
+    gap: 2rem;
+}
+
+.gender-options label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.gender-options input[type="radio"] {
+    cursor: pointer;
+}
+
+button {
+    background-color: var(--secondary-color);
+    color: white;
+    padding: 0.8rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* User Profile */
+.header {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+}
+
+.user-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.profile-photo {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--secondary-color);
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.user-details h2 {
+    color: var(--primary-color);
+    font-size: 1.5rem;
+    margin: 0;
+}
+
+.profile-button {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    width: auto;
+}
+
+.logout-button {
+    background-color: var(--error-color);
+    padding: 0.5rem 1rem;
+    width: auto;
+}
+
+.logout-button:hover {
+    background-color: #c0392b;
+}
+
+/* Profile Menu */
+.profile-menu {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    max-width: 500px;
+    width: 90%;
+}
+
+.profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+    position: relative;
+}
+
+.profile-header h3 {
+    color: var(--primary-color);
+    margin: 0;
+    flex-grow: 1;
+    text-align: center;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    color: #666;
+    cursor: pointer;
+    padding: 0.2rem;
+    line-height: 1;
+    border-radius: 50%;
+    width: 1.2rem;
+    height: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.close-button:hover {
+    background-color: #f0f0f0;
+    color: var(--error-color);
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+    font-weight: 500;
+}
+
+.photo-preview {
+    max-width: 200px;
+    border-radius: 8px;
+    margin-top: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Companies Section */
+.company-form,
+.companies-list {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.company-item {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 4px solid var(--secondary-color);
+}
+
+.company-info h4 {
+    color: var(--primary-color);
+    margin: 0;
+}
+
+.company-info p {
+    color: #666;
+    margin: 0.5rem 0 0;
+}
+
+.delete-company {
+    background-color: var(--error-color);
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+.delete-company:hover {
+    background-color: #c0392b;
+}
+
+/* Messages */
+.message {
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    text-align: center;
+    font-weight: 500;
+}
+
+.error {
+    background-color: var(--error-color);
+    color: white;
+}
+
+.success {
+    background-color: var(--success-color);
+    color: white;
+}
+
+/* Estilo Excel para a tabela de empresas */
+.companies-container {
+    background: white;
+    padding: 15px;
+    padding-left: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    max-height: 500px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--excel-header-bg) var(--excel-border);
+}
+
+.companies-container h3 {
+    color: var(--excel-header-bg);
+    margin-bottom: 20px;
+    font-size: 18px;
+    padding-left: 0;
+    margin-left: 0;
+    text-align: left;
+}
+
+#companiesTable {
+    width: 100%;
+    min-width: 600px;
+    border-collapse: collapse;
+    border: 1px solid var(--excel-border);
+    font-family: 'Calibri', 'Segoe UI', sans-serif;
+    font-size: 14px;
+    table-layout: fixed;
+}
+
+#companiesTable th {
+    background-color: var(--excel-header-bg);
+    color: var(--excel-header-text);
+    font-weight: normal;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid var(--excel-header-bg);
+    position: sticky;
+    top: 0;
+}
+
+#companiesTable td {
+    padding: 8px 12px;
+    border: 1px solid var(--excel-border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#companiesTable tr:nth-child(even) {
+    background-color: var(--excel-alt-row);
+}
+
+#companiesTable tr:hover {
+    background-color: var(--excel-hover);
+}
+
+/* Larguras específicas para cada coluna */
+#companiesTable th:nth-child(1),
+#companiesTable td:nth-child(1) {
+    width: 60px;
+    padding-right: 20px;
+}
+
+#companiesTable th:nth-child(2),
+#companiesTable td:nth-child(2) {
+    width: 45%;
+}
+
+#companiesTable th:nth-child(3),
+#companiesTable td:nth-child(3) {
+    width: 200px;
+    min-width: 200px;
+    font-family: 'Consolas', monospace;
+    padding-right: 20px;
+    white-space: nowrap;
+}
+
+/* Estilo para scrollbar no WebKit (Chrome, Safari) */
+.companies-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.companies-container::-webkit-scrollbar-track {
+    background: var(--excel-border);
+}
+
+.companies-container::-webkit-scrollbar-thumb {
+    background-color: var(--excel-header-bg);
+    border-radius: 4px;
+}

@@ -1,0 +1,7 @@
+kubectl create secret generic github-runner-secret \
+  --namespace=github-runner \
+  --from-literal=GITHUB_PAT=GERE_SECREST_COLOQUE_AQUI \
+  --from-literal=GITHUB_OWNER=westibcar \
+  --from-literal=REGISTRY_URL=registry.uday.corp:5000 \
+  --from-literal=REGISTRY_USER=dockeruser \
+  --from-literal=REGISTRY_PASSWORD=12345

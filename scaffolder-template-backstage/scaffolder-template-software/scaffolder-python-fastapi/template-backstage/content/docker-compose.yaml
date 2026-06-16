@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=change-me
+      - POSTGRES_DB=${{ values.databaseName }}
+    ports:
+      - "5432:5432"
+
+  backend:
+    image: python:3.11-slim
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://user:change-me@postgres:5432/${{ values.databaseName }}
+    ports:
+      - "${{ values.backendPort }}:${{ values.backendPort }}"
+    depends_on:
+      - postgres
+
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "${{ values.frontendPort }}:80"
+    depends_on:
+      - backend

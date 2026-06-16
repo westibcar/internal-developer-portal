@@ -1,0 +1,58 @@
+site_name: Uday App Docs
+site_description: Documentacao do template FastAPI para Backstage
+repo_url: >-
+  https://github.com/westibcar/internal-developer-portal/tree/main/scaffolder-template-backstage/scaffolder-template-software/scaffolder-python-fastapi
+edit_uri: edit/main/docs/
+nav:
+  - Início: index.md
+  - Começando:
+      - Visão geral: getting-started/overview.md
+      - Pré-requisitos: getting-started/prerequisites.md
+      - Instalação: getting-started/installation.md
+      - Início rápido: getting-started/quick-start.md
+  - Arquitetura:
+      - Visão geral do sistema: architecture/system-overview.md
+      - Estrutura do projeto: architecture/project-structure.md
+      - Decisões de design: architecture/design-decisions.md
+      - Diagramas: architecture/diagrams.md
+  - Backstage:
+      - Visão geral do template: backstage/template-overview.md
+      - Parâmetros do Scaffolder: backstage/scaffolder-parameters.md
+      - Catalog info: backstage/catalog-info.md
+      - Ciclo de vida: backstage/template-lifecycle.md
+  - API:
+      - Visão geral: api/overview.md
+      - Autenticação: api/authentication.md
+      - Endpoints: api/endpoints.md
+      - Exemplos de request e response: api/request-response-examples.md
+      - Tratamento de erros: api/error-handling.md
+      - Referência OpenAPI: api/openapi-reference.md
+  - Desenvolvimento:
+      - Desenvolvimento local: development/local-development.md
+      - Padrões de código: development/coding-standards.md
+      - Testes: development/testing.md
+      - Depuração: development/debugging.md
+      - Solução de problemas: development/troubleshooting.md
+  - Deploy:
+      - Ambientes: deployment/environments.md
+      - Docker: deployment/docker.md
+      - Kubernetes: deployment/kubernetes.md
+      - Helm: deployment/helm.md
+      - CI/CD: deployment/cicd.md
+  - Segurança:
+      - Autenticação: security/authentication.md
+      - Autorização: security/authorization.md
+      - Gestão de segredos: security/secrets-management.md
+      - Boas práticas: security/best-practices.md
+  - Operações:
+      - Monitoramento: operations/monitoring.md
+      - Logging: operations/logging.md
+      - Métricas: operations/metrics.md
+      - Alertas: operations/alerts.md
+  - Exemplos:
+      - Exemplos de uso: examples/usage-examples.md
+      - Exemplos de API: examples/api-examples.md
+      - Exemplos do template: examples/template-examples.md
+  - Glossário: glossary.md
+plugins:
+  - techdocs-core

@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.migrationsJob.name }}
+  namespace: {{ include "uday-app.namespace" . }}
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: migrations
+        image: {{ .Values.migrationsJob.image }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Aguardando PostgreSQL..."
+          while ! nc -z {{ .Values.postgres.service.name }} {{ .Values.postgres.service.port }}; do sleep 2; done
+          alembic upgrade head
+        envFrom:
+        - configMapRef:
+            name: {{ .Values.configmap.backend.name }}
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.backend.name }}
+              key: DATABASE_URL

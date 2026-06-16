@@ -1,0 +1,217 @@
+# =============================================================================
+# CI - Continuous Integration (Workflow Reutilizável)
+# =============================================================================
+# Responsabilidade:
+#   1. Detectar ONDE houve alteração (backend, frontend ou apenas helm)
+#   2. Fazer build SOMENTE do componente que mudou
+#   3. Fazer push da imagem para o registry
+#
+# Este workflow é chamado por ci-cd.yaml via workflow_call
+# =============================================================================
+
+name: CI - Build de Imagens
+
+on:
+  workflow_call:
+    inputs:
+      values_file:
+        description: "Caminho do values.yaml do Helm"
+        required: true
+        type: string
+    outputs:
+      backend:
+        description: "Se o backend foi alterado (true/false)"
+        value: ${{ jobs.detect-changes.outputs.backend }}
+      frontend:
+        description: "Se o frontend foi alterado (true/false)"
+        value: ${{ jobs.detect-changes.outputs.frontend }}
+      helm_only:
+        description: "Se apenas o Helm foi alterado, sem necessidade de build"
+        value: ${{ jobs.detect-changes.outputs.helm_only }}
+      backend_image:
+        description: "Nome base da imagem do backend (sem tag)"
+        value: ${{ jobs.detect-changes.outputs.backend_image }}
+      frontend_image:
+        description: "Nome base da imagem do frontend (sem tag)"
+        value: ${{ jobs.detect-changes.outputs.frontend_image }}
+      image_tag:
+        description: "Tag da imagem gerada (SHA curto do commit)"
+        value: ${{ jobs.detect-changes.outputs.image_tag }}
+
+# =============================================================================
+# Job 1: Detectar onde houve alteração e extrair nomes das imagens
+# =============================================================================
+jobs:
+  detect-changes:
+    name: "Detectar Alterações"
+    runs-on: self-hosted
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      helm_only: ${{ steps.filter.outputs.helm_only }}
+      backend_image: ${{ steps.images.outputs.backend_image }}
+      frontend_image: ${{ steps.images.outputs.frontend_image }}
+      image_tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Definir tag da imagem
+        id: tag
+        run: |
+          TAG="${GITHUB_SHA::7}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Tag da imagem: $TAG"
+
+      - name: Identificar componentes alterados
+        id: filter
+        run: |
+          # Pegar os arquivos alterados comparando com o commit anterior
+          BEFORE="${{ github.event.before }}"
+          if [[ "$BEFORE" == "0000000000000000000000000000000000000000" ]]; then
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-tree -r --name-only HEAD)
+          else
+            CHANGED_FILES=$(git diff --name-only "$BEFORE" "${{ github.sha }}")
+          fi
+
+          echo "========================================="
+          echo "Arquivos alterados:"
+          echo "$CHANGED_FILES"
+          echo "========================================="
+
+          BACKEND=false
+          FRONTEND=false
+          HELM_CHANGED=false
+          APP_CHANGED=false
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            case "$file" in
+              uday-app/app/*|uday-app/alembic/*|uday-app/alembic.ini|uday-app/requirements.txt)
+                BACKEND=true
+                APP_CHANGED=true
+                echo "  [BACKEND] $file"
+                ;;
+              uday-app/frontend/*)
+                FRONTEND=true
+                APP_CHANGED=true
+                echo "  [FRONTEND] $file"
+                ;;
+              Dockerfile.backend)
+                BACKEND=true
+                APP_CHANGED=true
+                echo "  [BACKEND] $file (Dockerfile)"
+                ;;
+              Dockerfile.frontend)
+                FRONTEND=true
+                APP_CHANGED=true
+                echo "  [FRONTEND] $file (Dockerfile)"
+                ;;
+              entrypoint.sh)
+                BACKEND=true
+                FRONTEND=true
+                APP_CHANGED=true
+                echo "  [BACKEND+FRONTEND] $file (compartilhado)"
+                ;;
+              nginx.conf)
+                FRONTEND=true
+                APP_CHANGED=true
+                echo "  [FRONTEND] $file (nginx config)"
+                ;;
+              helm/uday-app/*)
+                HELM_CHANGED=true
+                echo "  [HELM] $file"
+                ;;
+            esac
+          done <<< "$CHANGED_FILES"
+
+          if [[ "$HELM_CHANGED" == "true" ]] && [[ "$APP_CHANGED" == "false" ]]; then
+            HELM_ONLY=true
+          else
+            HELM_ONLY=false
+          fi
+
+          echo "backend=$BACKEND" >> "$GITHUB_OUTPUT"
+          echo "frontend=$FRONTEND" >> "$GITHUB_OUTPUT"
+          echo "helm_only=$HELM_ONLY" >> "$GITHUB_OUTPUT"
+
+          echo "========================================="
+          echo "Resultado da detecção:"
+          echo "  Backend precisa build:  $BACKEND"
+          echo "  Frontend precisa build: $FRONTEND"
+          echo "  Apenas Helm (sem build): $HELM_ONLY"
+          echo "========================================="
+
+      - name: Extrair nomes das imagens do values.yaml
+        id: images
+        run: |
+          VALUES_FILE="${{ inputs.values_file }}"
+
+          BACKEND_IMAGE=$(grep -A1 '^backend:' "$VALUES_FILE" | grep 'image:' | awk '{print $2}' | cut -d: -f1-2)
+          FRONTEND_IMAGE=$(grep -A1 '^frontend:' "$VALUES_FILE" | grep 'image:' | awk '{print $2}' | cut -d: -f1-2)
+
+          echo "Imagens detectadas no values.yaml:"
+          echo "  Backend:  $BACKEND_IMAGE"
+          echo "  Frontend: $FRONTEND_IMAGE"
+
+          echo "backend_image=$BACKEND_IMAGE" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=$FRONTEND_IMAGE" >> "$GITHUB_OUTPUT"
+
+# =============================================================================
+# Job 2: Build do Backend (somente se houve alteração)
+# =============================================================================
+  build-backend:
+    name: "Build Backend"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: self-hosted
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Build e push da imagem do backend
+        run: |
+          TAG="${{ needs.detect-changes.outputs.image_tag }}"
+          BACKEND_IMAGE="${{ needs.detect-changes.outputs.backend_image }}"
+          IMAGE="${BACKEND_IMAGE}:${TAG}"
+
+          echo "========================================="
+          echo "Construindo imagem do backend..."
+          echo "  Imagem: $IMAGE"
+          echo "========================================="
+
+          docker build -f Dockerfile.backend -t "$IMAGE" .
+          docker push "$IMAGE"
+
+          echo "Backend publicado com sucesso: $IMAGE"
+
+# =============================================================================
+# Job 3: Build do Frontend (somente se houve alteração)
+# =============================================================================
+  build-frontend:
+    name: "Build Frontend"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    runs-on: self-hosted
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Build e push da imagem do frontend
+        run: |
+          TAG="${{ needs.detect-changes.outputs.image_tag }}"
+          FRONTEND_IMAGE="${{ needs.detect-changes.outputs.frontend_image }}"
+          IMAGE="${FRONTEND_IMAGE}:${TAG}"
+
+          echo "========================================="
+          echo "Construindo imagem do frontend..."
+          echo "  Imagem: $IMAGE"
+          echo "========================================="
+
+          docker build -f Dockerfile.frontend -t "$IMAGE" .
+          docker push "$IMAGE"
+
+          echo "Frontend publicado com sucesso: $IMAGE"
+          

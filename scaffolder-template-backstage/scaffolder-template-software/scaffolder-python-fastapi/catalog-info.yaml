@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: uday-app
+  description: Cadastro de Empresas Uday
+  annotations:
+    github.com/project-slug: westibcar/backstage-uday-app
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: website
+  system: platform-cadastro
+  owner: guests
+  lifecycle: experimental

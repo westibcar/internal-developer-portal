@@ -1,0 +1,35 @@
+# Dockerfile para o Backend (FastAPI)
+# CI/CD Pipeline v3 - Teste E2E completo
+FROM python:3.11-slim
+
+# Definir um diretorio de trabalho
+WORKDIR /app
+
+# Instalação das dependencias do sistema
+RUN apt-get update && apt-get install -y \
+   gcc \
+   postgresql-client \
+   netcat-traditional \ 
+   && rm -rf /var/lib/apt/lists/*
+
+# Copiar o arquivo de requisitos
+COPY uday-app/requirements.txt .
+
+# Instalando as dependencias do sistema
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar o codigo da aplicação
+COPY uday-app/ .
+
+# Criar o diretorio de uploads
+RUN mkdir -p app/uploads
+
+# Copiar e configurar o script do entrypint
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Expoe a porta da aplicação
+EXPOSE 8000
+
+# Usando o entrypoint que executa as migrações antes de iniciar
+ENTRYPOINT [ "/entrypoint.sh" ]

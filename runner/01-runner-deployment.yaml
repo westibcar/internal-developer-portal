@@ -1,0 +1,390 @@
+# =============================================================================
+# GitHub Actions Self-Hosted Runner no Kubernetes
+# =============================================================================
+# Instala o runner como um Pod no cluster, com acesso ao Docker (DinD)
+# para buildar e fazer push das imagens da aplicação.
+#
+# Pré-requisitos:
+#   1. Criar um Personal Access Token (PAT) no GitHub com permissão "repo"
+#      GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
+#      Permissões necessárias: Actions (Read and Write), Administration (Read and Write)
+#
+#   2. Criar o secret no cluster:
+#      kubectl create namespace github-runner
+#      kubectl create secret generic github-runner-secret \
+#        --namespace=github-runner \
+#        --from-literal=GITHUB_PAT=ghp_SEU_TOKEN_AQUI \
+#        --from-literal=GITHUB_OWNER=SEU_USUARIO_OU_ORG \
+#        --from-literal=GITHUB_REPOSITORY=SEU_REPO
+#
+#   3. Aplicar os manifests:
+#      kubectl apply -f github-runner/
+#
+#   4. Verificar se o runner está rodando:
+#      kubectl get pods -n github-runner
+#      kubectl logs -n github-runner -l app=github-runner -f
+#
+#   5. Confirmar no GitHub:
+#      Repo → Settings → Actions → Runners → Runner aparece como "Idle"
+# =============================================================================
+---
+# Namespace dedicado para o runner
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: github-runner
+  labels:
+    app: github-runner
+---
+# ServiceAccount com permissões para o runner
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: github-runner-sa
+  namespace: github-runner
+---
+# Role para o runner (mínimo necessário)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: github-runner-role
+  namespace: github-runner
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: github-runner-rolebinding
+  namespace: github-runner
+subjects:
+  - kind: ServiceAccount
+    name: github-runner-sa
+    namespace: github-runner
+roleRef:
+  kind: Role
+  name: github-runner-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# =============================================================================
+# ClusterRole para o runner gerenciar Applications no ArgoCD
+# Permite criar/atualizar a Application caso ela não exista
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: github-runner-argocd
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    verbs: ["get", "list", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: github-runner-argocd-binding
+subjects:
+  - kind: ServiceAccount
+    name: github-runner-sa
+    namespace: github-runner
+roleRef:
+  kind: ClusterRole
+  name: github-runner-argocd
+  apiGroup: rbac.authorization.k8s.io
+---
+# =============================================================================
+# ClusterRole para o runner executar deploy via Helm
+# Necessario para armazenar release metadata e reconciliar recursos no namespace
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: github-runner-helm-deployer
+rules:
+  - apiGroups: [""]
+    resources:
+      [
+        "namespaces",
+        "configmaps",
+        "secrets",
+        "services",
+        "serviceaccounts",
+        "persistentvolumeclaims",
+      ]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "replicasets", "daemonsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.istio.io"]
+    resources: ["destinationrules", "virtualservices", "gateways"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: github-runner-helm-deployer-binding
+subjects:
+  - kind: ServiceAccount
+    name: github-runner-sa
+    namespace: github-runner
+roleRef:
+  kind: ClusterRole
+  name: github-runner-helm-deployer
+  apiGroup: rbac.authorization.k8s.io
+---
+# =============================================================================
+# Deployment do GitHub Actions Runner com Docker-in-Docker (DinD)
+# =============================================================================
+# Usa dois containers:
+#   1. runner  → Executa os jobs do GitHub Actions
+#   2. dind    → Docker daemon para build e push de imagens
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-runner
+  namespace: github-runner
+  labels:
+    app: github-runner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: github-runner
+  template:
+    metadata:
+      labels:
+        app: github-runner
+    spec:
+      serviceAccountName: github-runner-sa
+      containers:
+        # -----------------------------------------------------------------
+        # Container 1: GitHub Actions Runner
+        # -----------------------------------------------------------------
+        - name: runner
+          image: ghcr.io/actions/actions-runner:latest
+          env:
+            - name: DOCKER_HOST
+              value: tcp://localhost:2376
+            - name: DOCKER_TLS_VERIFY
+              value: "1"
+            - name: DOCKER_CERT_PATH
+              value: /certs/client
+            - name: RUNNER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: GITHUB_URL
+              value: "https://github.com/$(GITHUB_OWNER)/$(GITHUB_REPOSITORY)"
+            - name: GITHUB_OWNER
+              valueFrom:
+                secretKeyRef:
+                  name: github-runner-secret
+                  key: GITHUB_OWNER
+            - name: GITHUB_REPOSITORY
+              value: "internal-developer-portal"
+            - name: GITHUB_PAT
+              valueFrom:
+                secretKeyRef:
+                  name: github-runner-secret
+                  key: GITHUB_PAT
+            - name: REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: github-runner-secret
+                  key: REGISTRY_URL
+            - name: REGISTRY_USER
+              valueFrom:
+                secretKeyRef:
+                  name: github-runner-secret
+                  key: REGISTRY_USER
+            - name: REGISTRY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: github-runner-secret
+                  key: REGISTRY_PASSWORD
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+
+              echo "========================================="
+              echo "Iniciando configuração do GitHub Runner"
+              echo "  Owner: ${GITHUB_OWNER}"
+              echo "  Repo:  ${GITHUB_REPOSITORY}"
+              echo "  Nome:  ${RUNNER_NAME}"
+              echo "========================================="
+
+              # Instalar kubectl para o CD poder gerenciar ArgoCD Applications
+              echo "Instalando kubectl..."
+              KUBECTL_VERSION=$(curl -sL https://dl.k8s.io/release/stable.txt)
+              curl -sLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              # Instalar no diretório do runner (acessível pelo PATH dos jobs)
+              mkdir -p /home/runner/bin
+              mv kubectl /home/runner/bin/kubectl
+              export PATH="/home/runner/bin:$PATH"
+              # Adicionar ao PATH dos jobs do GitHub Actions
+              echo "PATH=/home/runner/bin:$PATH" >> /home/runner/.env 2>/dev/null || true
+              echo "kubectl instalado: $(kubectl version --client 2>&1 | head -1)"
+
+              # Aguardar DinD estar pronto (certs TLS)
+              echo "Aguardando DinD gerar certificados TLS..."
+              for i in $(seq 1 30); do
+                if [ -f /certs/client/cert.pem ]; then
+                  echo "Certificados DinD prontos."
+                  break
+                fi
+                echo "  Tentativa $i/30 - aguardando..."
+                sleep 2
+              done
+
+              # Login no Docker Registry privado
+              echo "Autenticando no registry ${REGISTRY_URL}..."
+              for i in $(seq 1 10); do
+                if docker login "${REGISTRY_URL}" -u "${REGISTRY_USER}" -p "${REGISTRY_PASSWORD}" 2>/dev/null; then
+                  echo "Login no registry realizado com sucesso."
+                  break
+                fi
+                echo "  Tentativa $i/10 - Docker daemon ainda não disponível..."
+                sleep 3
+              done
+
+              # Registrar o runner no GitHub
+              echo "Obtendo token de registro..."
+              RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                -H "Authorization: token ${GITHUB_PAT}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPOSITORY}/actions/runners/registration-token")
+
+              HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+              BODY=$(echo "$RESPONSE" | sed '$d')
+
+              echo "HTTP Status: $HTTP_CODE"
+
+              if [ "$HTTP_CODE" != "201" ]; then
+                echo "ERRO: Falha ao obter token de registro (HTTP $HTTP_CODE)"
+                echo "Resposta: $BODY"
+                echo "Verifique se o PAT tem permissões: Actions (Read/Write) e Administration (Read/Write)"
+                exit 1
+              fi
+
+              RUNNER_TOKEN=$(echo "$BODY" | grep -o '"token": *"[^"]*"' | cut -d'"' -f4)
+
+              if [ -z "$RUNNER_TOKEN" ]; then
+                echo "ERRO: Token de registro veio vazio!"
+                echo "Resposta da API: $BODY"
+                exit 1
+              fi
+
+              echo "Token de registro obtido com sucesso."
+
+              ./config.sh \
+                --url "https://github.com/${GITHUB_OWNER}/${GITHUB_REPOSITORY}" \
+                --token "${RUNNER_TOKEN}" \
+                --name "${RUNNER_NAME}" \
+                --labels "self-hosted,linux,kubernetes" \
+                --unattended \
+                --replace
+
+              echo "Runner configurado com sucesso!"
+
+              # Cleanup ao encerrar o Pod
+              cleanup() {
+                echo "Removendo runner do GitHub..."
+                REMOVE_TOKEN=$(curl -s -X POST \
+                  -H "Authorization: token ${GITHUB_PAT}" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPOSITORY}/actions/runners/registration-token" \
+                  | grep -o '"token": *"[^"]*"' | cut -d'"' -f4)
+                ./config.sh remove --token "${REMOVE_TOKEN}" || true
+              }
+              trap cleanup EXIT TERM INT
+
+              # Iniciar o runner
+              echo "Iniciando runner..."
+              ./run.sh
+          volumeMounts:
+            - name: docker-certs
+              mountPath: /certs
+              readOnly: true
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "3Gi"
+
+        # -----------------------------------------------------------------
+        # Container 2: Docker-in-Docker (DinD)
+        # -----------------------------------------------------------------
+        - name: dind
+          image: docker:dind
+          securityContext:
+            privileged: true
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: /certs
+          volumeMounts:
+            - name: docker-certs
+              mountPath: /certs
+            - name: docker-storage
+              mountPath: /var/lib/docker
+            - name: docker-daemon-config
+              mountPath: /etc/docker/daemon.json
+              subPath: daemon.json
+              readOnly: true
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "6Gi"
+
+      volumes:
+        - name: docker-certs
+          emptyDir: {}
+        - name: docker-storage
+          emptyDir: {}
+        - name: docker-daemon-config
+          configMap:
+            name: docker-daemon-config
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: github-runner-argocd
+  namespace: argocd
+rules:
+  - apiGroups: [argoproj.io]
+    resources: [applications]
+    verbs: [get, list, watch, create, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: github-runner-argocd
+  namespace: argocd
+subjects:
+  - kind: ServiceAccount
+    name: github-runner-sa
+    namespace: github-runner
+roleRef:
+  kind: Role
+  name: github-runner-argocd
+  apiGroup: rbac.authorization.k8s.io
+            

@@ -1,0 +1,59 @@
+name: Backstage CI/CD Pipeline
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'developer-portal/**'
+      - 'kubernetes/helm/backstage/**'
+      - '.github/workflows/*.yaml'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Forçar build de ambas as imagens mesmo sem mudanças no código'
+        type: boolean
+        default: false
+
+concurrency:
+  group: backstage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: CI
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/ci.yaml
+    with:
+      force_build: ${{ github.event_name == 'workflow_dispatch' && inputs.force_build == true }}
+    secrets: inherit
+
+  cd_dev:
+    name: CD (dev)
+    needs: ci
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.ci.result == 'success'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/cd.yaml
+    with:
+      environment: dev
+      image_tag: ${{ needs.ci.outputs.image_tag }}
+      version: ${{ needs.ci.outputs.version }}
+      backend_changed: ${{ needs.ci.outputs.backend_changed }}
+      frontend_changed: ${{ needs.ci.outputs.frontend_changed }}
+    secrets: inherit
+
+  cd_prod:
+    name: CD (prod)
+    if: github.event_name == 'release' && github.event.action == 'published'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/cd.yaml
+    with:
+      environment: prod
+      image_tag: ${{ github.event.release.tag_name }}
+      version: ${{ github.event.release.tag_name }}
+      backend_changed: 'true'
+      frontend_changed: 'true'
+    secrets: inherit

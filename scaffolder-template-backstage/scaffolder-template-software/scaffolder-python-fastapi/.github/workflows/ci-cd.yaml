@@ -1,0 +1,56 @@
+# =============================================================================
+# CI/CD Pipeline - Uday App (Orquestrador)
+# =============================================================================
+# Este é o workflow principal que orquestra os workflows reutilizáveis:
+#   - ci.yaml → Detecta alterações e faz build das imagens
+#   - cd.yaml → Atualiza o Helm values.yaml para deploy via ArgoCD
+#
+# Conceito para alunos:
+#   workflow_call = reutilização de workflows no GitHub Actions
+#   ci-cd.yaml chama ci.yaml e cd.yaml passando inputs e secrets
+# =============================================================================
+
+name: CI/CD Pipeline - Uday App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'uday-app/**'
+      - 'Dockerfile.backend'
+      - 'Dockerfile.frontend'
+      - 'entrypoint.sh'
+      - 'nginx.conf'
+      - 'helm/uday-app/**'
+
+jobs:
+# =============================================================================
+# Etapa 1: CI - Detectar alterações e fazer build das imagens
+# =============================================================================
+  ci:
+    name: "CI - Continuous Integration"
+    uses: ./.github/workflows/ci.yaml
+    with:
+      values_file: helm/uday-app/values.yaml
+
+# =============================================================================
+# Etapa 2: CD - Atualizar Helm e deploy via ArgoCD
+#          Só executa se houve build de imagem (não quando é só Helm)
+# =============================================================================
+  cd:
+    name: "CD - Continuous Delivery"
+    needs: ci
+    if: |
+      needs.ci.outputs.helm_only != 'true' &&
+      (needs.ci.outputs.backend == 'true' || needs.ci.outputs.frontend == 'true')
+    uses: ./.github/workflows/cd.yaml
+    with:
+      values_file: helm/uday-app/values.yaml
+      backend_changed: ${{ needs.ci.outputs.backend }}
+      frontend_changed: ${{ needs.ci.outputs.frontend }}
+      backend_image: ${{ needs.ci.outputs.backend_image }}
+      frontend_image: ${{ needs.ci.outputs.frontend_image }}
+      image_tag: ${{ needs.ci.outputs.image_tag }}
+    secrets:
+      token: ${{ secrets.GH_PAT }}
+      

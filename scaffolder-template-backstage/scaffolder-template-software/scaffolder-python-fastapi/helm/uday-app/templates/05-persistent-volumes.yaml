@@ -1,0 +1,32 @@
+# PersistentVolumeClaim para dados do PostgreSQL
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.persistence.postgres.name }}
+  namespace: {{ include "uday-app.namespace" . }}
+  labels:
+    app: postgres
+spec:
+  storageClassName: {{ .Values.persistence.storageClassName }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.postgres.size }}
+
+---
+# PersistentVolumeClaim para arquivos de upload do Backend
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.persistence.uploads.name }}
+  namespace: {{ include "uday-app.namespace" . }}
+  labels:
+    app: backend
+spec:
+  storageClassName: {{ .Values.persistence.storageClassName }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.uploads.size }}

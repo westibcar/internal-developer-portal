@@ -1,0 +1,6 @@
+apiVersion: v2
+name: backstage
+description: Deploy do Backstage com frontend e backend separados e PostgreSQL no Kubernetes
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

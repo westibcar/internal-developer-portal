@@ -1,0 +1,233 @@
+name: CD - GitOps Update
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      backend_changed:
+        required: true
+        type: string
+      frontend_changed:
+        required: true
+        type: string
+
+jobs:
+  gitops_update:
+    name: Update GitOps (${{ inputs.environment }})
+    runs-on: [self-hosted, linux, kubernetes]
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ inputs.environment == 'prod' && 'main' || 'develop' }}
+
+      - name: Resolve config
+        id: config
+        shell: bash
+        run: |
+          case "${{ inputs.environment }}" in
+            dev)
+              echo "values_file=kubernetes/helm/backstage/values-dev.yaml" >> "$GITHUB_OUTPUT"
+              echo "push_ref=develop" >> "$GITHUB_OUTPUT"
+              ;;
+            prod)
+              echo "values_file=kubernetes/helm/backstage/values-prod.yaml" >> "$GITHUB_OUTPUT"
+              echo "push_ref=main" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unknown environment: ${{ inputs.environment }}"; exit 1
+              ;;
+          esac
+
+      - name: Install yq
+        shell: bash
+        run: |
+          if ! command -v yq &>/dev/null; then
+            curl -sSL "https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_amd64" \
+              -o "$RUNNER_TEMP/yq"
+            chmod +x "$RUNNER_TEMP/yq"
+            echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+          fi
+
+      - name: Update image tags in values file
+        shell: bash
+        run: |
+          VALUES_FILE="${{ steps.config.outputs.values_file }}"
+          IMAGE_TAG="${{ inputs.image_tag }}"
+
+          if [[ ! -f "$VALUES_FILE" ]]; then
+            echo "Values file not found: $VALUES_FILE"
+            exit 1
+          fi
+
+          if [[ "${{ inputs.backend_changed }}" == 'true' ]]; then
+            yq e ".backend.image.tag = \"${IMAGE_TAG}\"" -i "$VALUES_FILE"
+          fi
+          if [[ "${{ inputs.frontend_changed }}" == 'true' ]]; then
+            yq e ".frontend.image.tag = \"${IMAGE_TAG}\"" -i "$VALUES_FILE"
+          fi
+
+      - name: Commit and push GitOps change
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ steps.config.outputs.values_file }}"
+          if git diff --cached --quiet; then
+            echo 'No values change to commit'
+            exit 0
+          fi
+          git commit -m "ci: update ${{ inputs.environment }} image tag to ${{ inputs.image_tag }} [skip ci]"
+          git push origin "${{ steps.config.outputs.push_ref }}"
+
+  argocd_sync:
+    name: Sync ArgoCD (${{ inputs.environment }})
+    needs: gitops_update
+    runs-on: [self-hosted, linux, kubernetes]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBECONFIG_B64 }}" | base64 --decode > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Ensure ArgoCD Application exists
+        shell: bash
+        run: |
+          case "${{ inputs.environment }}" in
+            dev)
+              APP_MANIFEST='argocd/app-of-apps/apps/dev/application.yaml'
+              APP_NAME='backstage-dev'
+              ;;
+            prod)
+              APP_MANIFEST='argocd/app-of-apps/apps/prod/application.yaml'
+              APP_NAME='backstage-prod'
+              ;;
+            *)
+              echo "Unknown environment: ${{ inputs.environment }}"; exit 1
+              ;;
+          esac
+
+          if ! kubectl get application "$APP_NAME" -n argocd &>/dev/null; then
+            echo "Application $APP_NAME nao encontrada, criando..."
+            kubectl apply -f "$APP_MANIFEST"
+          else
+            echo "Application $APP_NAME ja existe"
+          fi
+
+          echo "APP_NAME=$APP_NAME" >> "$GITHUB_ENV"
+
+      - name: Trigger refresh and wait for sync
+        shell: bash
+        run: |
+          kubectl annotate application "$APP_NAME" -n argocd \
+            argocd.argoproj.io/refresh=normal --overwrite
+
+          echo "Aguardando ArgoCD sincronizar..."
+          if ! kubectl wait application/"$APP_NAME" -n argocd \
+            --for=jsonpath='{.status.sync.status}'=Synced \
+            --timeout=300s; then
+            echo "--- Status da Application ---"
+            kubectl get application "$APP_NAME" -n argocd \
+              -o jsonpath='{.status.sync}{"\n"}{.status.conditions}' || true
+            echo ""
+            exit 1
+          fi
+
+      - name: Wait for healthy
+        shell: bash
+        run: |
+          echo "Aguardando recursos ficarem Healthy..."
+          if ! kubectl wait application/"$APP_NAME" -n argocd \
+            --for=jsonpath='{.status.health.status}'=Healthy \
+            --timeout=600s; then
+            echo "--- Status da Application ---"
+            kubectl get application "$APP_NAME" -n argocd \
+              -o jsonpath='{.status.health}{"\n"}' || true
+            echo ""
+            echo "--- Pods no namespace ---"
+            kubectl get pods -n "backstage-${{ inputs.environment }}" || true
+            echo ""
+            echo "--- Eventos recentes ---"
+            kubectl get events -n "backstage-${{ inputs.environment }}" \
+              --sort-by='.lastTimestamp' | tail -20 || true
+            exit 1
+          fi
+
+          echo "Deploy concluido com sucesso para ${{ inputs.environment }}"
+
+  create_release:
+    name: Create GitHub Release
+    needs: argocd_sync
+    if: inputs.environment == 'dev' && (inputs.backend_changed == 'true' || inputs.frontend_changed == 'true')
+    runs-on: [self-hosted, linux, kubernetes]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: develop
+
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          PREV=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1) || true
+          if [[ -n "$PREV" ]]; then
+            NOTES=$(git log "${PREV}..HEAD" --pretty=format:"- %s (%h)" --no-merges) || true
+          else
+            NOTES=$(git log --pretty=format:"- %s (%h)" --no-merges -n 30) || true
+          fi
+          {
+            echo 'notes<<EOF'
+            printf '%s\n' "$NOTES"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Ensure gh CLI
+        shell: bash
+        run: |
+          if command -v gh &>/dev/null; then
+            exit 0
+          fi
+          SUDO=""
+          [[ "$(id -u)" -ne 0 ]] && SUDO="sudo"
+          $SUDO apt-get update
+          $SUDO apt-get install -y curl
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | $SUDO dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          $SUDO chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | $SUDO tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+          $SUDO apt-get update
+          $SUDO apt-get install -y gh
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          if gh release view "${{ inputs.version }}" &>/dev/null; then
+            echo "Release ${{ inputs.version }} already exists, skipping"
+          else
+            gh release create "${{ inputs.version }}" \
+              --title "Release ${{ inputs.version }}" \
+              --notes "${{ steps.changelog.outputs.notes }}" \
+              --target develop
+          fi
