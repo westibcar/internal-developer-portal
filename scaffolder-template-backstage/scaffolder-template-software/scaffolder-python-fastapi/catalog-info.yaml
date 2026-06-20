@@ -6,6 +6,11 @@ metadata:
   annotations:
     github.com/project-slug: westibcar/backstage-uday-app
     backstage.io/techdocs-ref: dir:.
+    # backstage.io/kubernetes-id: valor que o Backstage usa para filtrar recursos no cluster.
+    # Os pods/deployments devem ter o label "backstage.io/kubernetes-id: uday-app" para aparecer aqui.
+    backstage.io/kubernetes-id: uday-app
+    # backstage.io/kubernetes-namespace: namespace onde os recursos do serviço estão deployados.
+    backstage.io/kubernetes-namespace: uday-app
 spec:
   type: website
   system: platform-cadastro
