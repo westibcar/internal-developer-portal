@@ -61,6 +61,7 @@ integrations:
 proxy:
   ### Example for how to add a proxy endpoint for the frontend.
   ### A typical reason to do this is to handle HTTPS and CORS for internal services.
+  endpoints: {}
   # endpoints:
   #   '/test':
   #     target: 'https://example.com'
@@ -97,6 +98,8 @@ auth:
 
 scaffolder:
   # see https://backstage.io/docs/features/software-templates/configuration for software template options
+  defaultAuthor:
+    name: Backstage
 
 catalog:
   import:
@@ -141,7 +144,25 @@ catalog:
     #     - allow: [User, Group]
 
 kubernetes:
-  # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
+  # serviceLocatorMethod define como o Backstage descobre a qual cluster um componente pertence.
+  # "multiTenant" é o modo padrão: procura em todos os clusters configurados.
+  serviceLocatorMethod:
+    type: multiTenant
+
+  # clusterLocatorMethods define como o Backstage encontra os clusters.
+  # O tipo "config" usa clusters definidos estaticamente aqui no arquivo.
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: local-cluster
+          # URL da API do Kubernetes — obtida com: kubectl cluster-info
+          url: https://192.168.1.200:6443
+          # authProvider: serviceAccount usa o token do ServiceAccount criado no passo 1
+          authProvider: serviceAccount
+          serviceAccountToken: ${K8S_SERVICE_ACCOUNT_TOKEN}
+          # caData: certificado CA do cluster em base64 — obtido com:
+          # kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}'
+          caData: ${K8S_CA_DATA}
 
 # see https://backstage.io/docs/permissions/getting-started for more on the permission framework
 permission:

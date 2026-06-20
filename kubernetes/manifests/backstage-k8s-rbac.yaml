@@ -1,0 +1,61 @@
+# ServiceAccount usado pelo Backstage para autenticar no cluster
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backstage
+  namespace: default
+---
+# ClusterRole com permissões somente leitura nos recursos que o Backstage exibe
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backstage-read-only
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - configmaps
+      - namespaces
+      - resourcequotas
+      - limitranges
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - pods
+    verbs: ["get", "watch", "list"]
+---
+# Vincula o ClusterRole ao ServiceAccount do Backstage em todo o cluster
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backstage-read-only
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backstage-read-only
+subjects:
+  - kind: ServiceAccount
+    name: backstage
+    namespace: default
