@@ -27,3 +27,15 @@ data:
       providers:
         guest:
           dangerouslyAllowOutsideDevelopment: true
+
+    kubernetes:
+      serviceLocatorMethod:
+        type: multiTenant
+      clusterLocatorMethods:
+        - type: config
+          clusters:
+            - name: local-cluster
+              url: https://192.168.1.200:6443
+              authProvider: serviceAccount
+              serviceAccountToken: ${K8S_SERVICE_ACCOUNT_TOKEN}
+              caData: ${K8S_CA_DATA}

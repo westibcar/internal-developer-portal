@@ -82,6 +82,21 @@ spec:
                 secretKeyRef:
                   name: {{ include "backstage.postgresSecretName" . }}
                   key: POSTGRES_DB
+            - name: K8S_SERVICE_ACCOUNT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "backstage.fullname" . }}-secrets
+                  key: K8S_SERVICE_ACCOUNT_TOKEN
+            - name: K8S_CA_DATA
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "backstage.fullname" . }}-secrets
+                  key: K8S_CA_DATA
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "backstage.fullname" . }}-secrets
+                  key: GITHUB_TOKEN
           volumeMounts:
             - name: backstage-config
               mountPath: /etc/backstage

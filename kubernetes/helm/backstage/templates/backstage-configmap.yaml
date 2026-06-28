@@ -27,3 +27,15 @@ data:
       providers:
         guest:
           dangerouslyAllowOutsideDevelopment: true
+
+    kubernetes:
+      serviceLocatorMethod:
+        type: multiTenant
+      clusterLocatorMethods:
+        - type: config
+          clusters:
+            - name: {{ .Values.kubernetes.clusterName | quote }}
+              url: {{ .Values.kubernetes.clusterUrl | quote }}
+              authProvider: serviceAccount
+              serviceAccountToken: ${K8S_SERVICE_ACCOUNT_TOKEN}
+              caData: ${K8S_CA_DATA}

@@ -1,5 +1,16 @@
 imagePullSecrets: []
 
+# Credenciais sensíveis — NÃO preencher aqui.
+# Preencher em values-dev.yaml / values-prod.yaml OU criar o Secret manualmente no cluster.
+secrets:
+  k8sServiceAccountToken: ""
+  k8sCaData: ""
+  githubToken: ""
+
+kubernetes:
+  clusterName: "local-cluster"
+  clusterUrl: ""
+
 namespace:
   name: ""
 
