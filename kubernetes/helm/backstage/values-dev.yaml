@@ -11,7 +11,7 @@ secrets:
 namespace:
   name: backstage-dev
 global:
-  baseUrl: https://developer-portal-dev.uday.corp
+  baseUrl: http://developer-portal-dev.uday.corp
 istio:
   enabled: true
   host: developer-portal-dev.uday.corp
