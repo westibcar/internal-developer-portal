@@ -1,7 +1,9 @@
 fullnameOverride: backstage
+
 kubernetes:
   clusterName: local-cluster
   clusterUrl: https://192.168.1.200:6443
+
 namespace:
   name: backstage
 secrets:

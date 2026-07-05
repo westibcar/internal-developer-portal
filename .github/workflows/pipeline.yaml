@@ -2,13 +2,11 @@ name: Backstage CI/CD Pipeline
 
 on:
   push:
-    branches: [develop]
+    branches: [develop, main]
     paths:
       - 'developer-portal/**'
       - 'kubernetes/helm/backstage/**'
       - '.github/workflows/*.yaml'
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       force_build:
@@ -32,7 +30,10 @@ jobs:
   cd_dev:
     name: CD (dev)
     needs: ci
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.ci.result == 'success'
+    if: >-
+      needs.ci.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/develop'))
     permissions:
       contents: write
     uses: ./.github/workflows/cd.yaml
@@ -46,14 +47,17 @@ jobs:
 
   cd_prod:
     name: CD (prod)
-    if: github.event_name == 'release' && github.event.action == 'published'
+    needs: ci
+    if: >-
+      needs.ci.result == 'success' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
     uses: ./.github/workflows/cd.yaml
     with:
       environment: prod
-      image_tag: ${{ github.event.release.tag_name }}
-      version: ${{ github.event.release.tag_name }}
-      backend_changed: 'true'
-      frontend_changed: 'true'
+      image_tag: ${{ needs.ci.outputs.image_tag }}
+      version: ${{ needs.ci.outputs.version }}
+      backend_changed: ${{ needs.ci.outputs.backend_changed }}
+      frontend_changed: ${{ needs.ci.outputs.frontend_changed }}
     secrets: inherit
