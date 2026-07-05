@@ -152,6 +152,21 @@ jobs:
             exit 1
           fi
 
+      - name: Apply postgres secret (prod)
+        if: inputs.environment == 'prod'
+        shell: bash
+        run: |
+          # values-prod.yaml usa postgres.auth.existingSecret, entao o chart
+          # nao cria esse Secret (evita senha em texto plano no Git). Mesma
+          # logica de timing do step seguinte: roda depois do sync do ArgoCD
+          # para nao ser apagado por prune de uma versao antiga do chart.
+          kubectl create secret generic backstage-postgres-secret \
+            -n backstage \
+            --from-literal=POSTGRES_USER=backstage \
+            --from-literal=POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD_PROD }}" \
+            --from-literal=POSTGRES_DB=backstage_prod \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Apply backend secret
         shell: bash
         run: |
