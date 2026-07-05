@@ -86,7 +86,7 @@ jobs:
           HEAD='${{ github.sha }}'
           ZERO='0000000000000000000000000000000000000000'
 
-          if [[ "$BASE" == "$ZERO" ]]; then
+          if [[ -z "$BASE" || "$BASE" == "$ZERO" ]]; then
             echo 'backend_changed=true'  >> "$GITHUB_OUTPUT"
             echo 'frontend_changed=true' >> "$GITHUB_OUTPUT"
             exit 0
