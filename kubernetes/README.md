@@ -269,15 +269,21 @@ cluster e do Git:
 2. **OAuth Apps do GitHub** (`https://github.com/settings/developers`) — um
    para dev, um para prod, cada um com sua Authorization callback URL. Tambem
    sobrevivem a recriacao do cluster.
-3. **Bootstrap do ArgoCD** (uma vez por cluster novo):
+3. **Bootstrap do ArgoCD** — o job de dev (`.github/workflows/cd.yaml`, step
+   "Ensure ArgoCD root Application exists (dev)") ja garante sozinho que a
+   Application `developer-portal` (root app-of-apps) existe, criando-a se
+   necessario. Isso cria/gerencia o `AppProject backstage` e as Applications
+   `backstage-dev`/`backstage-prod` via GitOps. Ou seja: **rodar o deploy de
+   dev uma vez** (push em `develop`) e reproduz sozinho.
+   - O job de prod **nao** faz esse bootstrap de proposito (roda so via
+     `release: published`, que deve acontecer depois do dev). Se por algum
+     motivo prod precisar rodar num cluster novo antes do dev ter rodado ao
+     menos uma vez, aplique manualmente antes:
 
-   ```bash
-   kubectl apply -f argocd/app-of-apps/root/application-developer-portal.yaml -n argocd
-   ```
+     ```bash
+     kubectl apply -f argocd/app-of-apps/root/application-developer-portal.yaml -n argocd
+     ```
 
-   Isso cria a Application `developer-portal`, que por sua vez cria/gerencia o
-   `AppProject backstage` e as Applications `backstage-dev`/`backstage-prod`
-   via GitOps — nao precisa mais aplicar `project-backstage.yaml` a parte.
 4. Os secrets `backstage-dev-secrets`, `backstage-secrets` (backend) e
    `backstage-postgres-secret` (Postgres de prod) sao recriados automaticamente
    pelo pipeline de CD na primeira execucao apos o bootstrap (nao precisa
@@ -286,6 +292,6 @@ cluster e do Git:
 5. Namespaces (`backstage-dev`, `backstage`) sao criados automaticamente pelo
    ArgoCD (`CreateNamespace=true`).
 
-Ou seja: depois de um cluster novo, o unico comando manual necessario e o do
-passo 3 — o resto (`git push`/release) aciona o pipeline e ele termina de
-montar tudo.
+Ou seja: depois de um cluster novo, basta um `git push` em `develop` — o
+pipeline de dev cria o bootstrap do ArgoCD e o resto se monta sozinho. Prod so
+precisa do passo manual do item 3 se rodar antes do primeiro deploy de dev.
