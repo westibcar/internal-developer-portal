@@ -109,6 +109,17 @@ jobs:
           echo "${{ secrets.KUBECONFIG_B64 }}" | base64 --decode > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
 
+      - name: Ensure ArgoCD root Application exists (dev)
+        if: inputs.environment == 'dev'
+        shell: bash
+        run: |
+          if ! kubectl get application developer-portal -n argocd &>/dev/null; then
+            echo "Application developer-portal (root) nao encontrada, criando..."
+            kubectl apply -f argocd/app-of-apps/root/application-developer-portal.yaml
+          else
+            echo "Application developer-portal (root) ja existe"
+          fi
+
       - name: Ensure ArgoCD Application exists
         shell: bash
         run: |
