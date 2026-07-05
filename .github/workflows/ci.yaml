@@ -104,7 +104,7 @@ jobs:
             SHARED_CHANGED=true
           fi
 
-          if [[ "$SHARED_CHANGED" == 'true' ]] || echo "$DIFF" | grep -q 'developer-portal/packages/backend/'; then
+          if [[ "$SHARED_CHANGED" == 'true' ]] || echo "$DIFF" | grep -qE 'developer-portal/packages/backend/|developer-portal/app-config|developer-portal/iam/'; then
             echo 'backend_changed=true'  >> "$GITHUB_OUTPUT"
           else
             echo 'backend_changed=false' >> "$GITHUB_OUTPUT"

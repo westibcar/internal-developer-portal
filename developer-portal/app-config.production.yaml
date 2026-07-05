@@ -48,8 +48,14 @@ catalog:
       rules:
         - allow: [Template]
 
-    # Local example organizational data
+    # Usuarios
     - type: file
-      target: ./examples/org.yaml
+      target: ./iam/usuarios/usuarios.yaml
       rules:
-        - allow: [User, Group]
+        - allow: [User]
+
+    # Grupos
+    - type: file
+      target: ./iam/grupos/grupos.yaml
+      rules:
+        - allow: [Group]
