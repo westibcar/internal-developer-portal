@@ -96,6 +96,7 @@ jobs:
     name: Sync ArgoCD (${{ inputs.environment }})
     needs: gitops_update
     runs-on: [self-hosted, linux, kubernetes]
+    environment: ${{ inputs.environment }}
     permissions:
       contents: read
     steps:
@@ -107,6 +108,37 @@ jobs:
           mkdir -p "$HOME/.kube"
           echo "${{ secrets.KUBECONFIG_B64 }}" | base64 --decode > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
+
+      - name: Apply backend secret
+        shell: bash
+        run: |
+          case "${{ inputs.environment }}" in
+            dev)
+              NAMESPACE='backstage-dev'
+              SECRET_NAME='backstage-dev-secrets'
+              BACKEND_DEPLOYMENT='backstage-dev-backend'
+              ;;
+            prod)
+              NAMESPACE='backstage'
+              SECRET_NAME='backstage-secrets'
+              BACKEND_DEPLOYMENT='backstage-backend'
+              ;;
+            *)
+              echo "Unknown environment: ${{ inputs.environment }}"; exit 1
+              ;;
+          esac
+
+          kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic "$SECRET_NAME" \
+            -n "$NAMESPACE" \
+            --from-literal=K8S_SERVICE_ACCOUNT_TOKEN="${{ secrets.K8S_SERVICE_ACCOUNT_TOKEN }}" \
+            --from-literal=K8S_CA_DATA="${{ secrets.K8S_CA_DATA }}" \
+            --from-literal=GITHUB_TOKEN="${{ secrets.BACKSTAGE_GITHUB_TOKEN }}" \
+            --from-literal=AUTH_GITHUB_CLIENT_ID="${{ secrets.AUTH_GITHUB_CLIENT_ID }}" \
+            --from-literal=AUTH_GITHUB_CLIENT_SECRET="${{ secrets.AUTH_GITHUB_CLIENT_SECRET }}" \
+            --dry-run=client -o yaml | kubectl apply -f - | grep -v unchanged \
+            && kubectl rollout restart "deployment/$BACKEND_DEPLOYMENT" -n "$NAMESPACE" || true
 
       - name: Ensure ArgoCD Application exists
         shell: bash

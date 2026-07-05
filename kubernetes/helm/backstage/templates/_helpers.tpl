@@ -22,6 +22,14 @@
 {{- end -}}
 {{- end -}}
 
+{{- define "backstage.secretsName" -}}
+{{- if .Values.secrets.existingSecret -}}
+{{- .Values.secrets.existingSecret -}}
+{{- else -}}
+{{- printf "%s-secrets" (include "backstage.fullname" .) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "backstage.postgresHost" -}}
 {{- if .Values.postgres.host -}}
 {{- .Values.postgres.host -}}

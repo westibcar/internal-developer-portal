@@ -3,6 +3,9 @@ fullnameOverride: backstage
 namespace:
   name: backstage
 
+secrets:
+  existingSecret: backstage-secrets
+
 global:
   baseUrl: https://developer-portal.uday.corp
 

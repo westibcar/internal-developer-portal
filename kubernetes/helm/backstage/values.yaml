@@ -3,9 +3,15 @@ imagePullSecrets: []
 # Credenciais sensíveis — NÃO preencher aqui.
 # Preencher em values-dev.yaml / values-prod.yaml OU criar o Secret manualmente no cluster.
 secrets:
+  # Se preenchido, o chart NAO cria o Secret e apenas referencia este nome
+  # (crie-o manualmente com `kubectl create secret generic`). Os campos abaixo
+  # sao ignorados quando existingSecret esta definido.
+  existingSecret: ""
   k8sServiceAccountToken: ""
   k8sCaData: ""
   githubToken: ""
+  githubClientId: ""
+  githubClientSecret: ""
 
 kubernetes:
   clusterName: "local-cluster"

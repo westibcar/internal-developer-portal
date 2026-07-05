@@ -4,13 +4,10 @@ fullnameOverride: backstage-dev
 kubernetes:
   clusterName: local-cluster
   clusterUrl: https://192.168.1.200:6443
-# Preencha os valores abaixo com as credenciais reais antes de aplicar.
-# Token: kubectl create token backstage -n default --duration=8760h
-# CA:    kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}'
+# Segredo criado manualmente no cluster (ver kubernetes/README.md), nunca commitado.
+# Nenhuma credencial fica neste arquivo/Git.
 secrets:
-  k8sServiceAccountToken: "SUBSTITUA_PELO_TOKEN"
-  k8sCaData: "SUBSTITUA_PELO_CA_DATA"
-  githubToken: "SUBSTITUA_PELO_GITHUB_TOKEN"
+  existingSecret: backstage-dev-secrets
 namespace:
   name: backstage-dev
 global:

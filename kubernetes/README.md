@@ -95,6 +95,44 @@ Atualizar:
 helm upgrade backstage kubernetes/helm/backstage -n backstage
 ```
 
+### Secret do backend (sem expor credenciais no Git)
+
+O chart nunca deve receber credenciais reais via `values-*.yaml`. Em vez disso,
+`secrets.existingSecret: <nome>` ja esta configurado em `values-dev.yaml` e
+`values-prod.yaml`, e o proprio pipeline de CD (`.github/workflows/cd.yaml`,
+job `argocd_sync`, step "Apply backend secret") cria/atualiza esse Secret a
+cada deploy, lendo os valores dos GitHub Environment secrets (`dev` e `prod`):
+
+- `K8S_SERVICE_ACCOUNT_TOKEN`
+- `K8S_CA_DATA`
+- `BACKSTAGE_GITHUB_TOKEN` (fine-grained token do GitHub)
+- `AUTH_GITHUB_CLIENT_ID` (OAuth App do GitHub, usado no login)
+- `AUTH_GITHUB_CLIENT_SECRET`
+
+Cadastre esses 5 valores em **Settings > Environments > dev/prod > Secrets** no
+GitHub (valores diferentes por ambiente, mesmo nome). O pipeline aplica o
+Secret via `kubectl create secret ... --dry-run=client -o yaml | kubectl apply -f -`
+e reinicia o `Deployment` do backend automaticamente **somente quando algum
+valor muda** (pods so leem env vars na inicializacao).
+
+Quando `secrets.existingSecret` esta preenchido, o chart **nao** cria nem gerencia
+esse Secret (ver `templates/backstage-secrets.yaml`), entao nada sensivel entra no
+`values-dev.yaml`/`values-prod.yaml` nem no historico do Git.
+
+Para rodar localmente sem o pipeline (ex.: debug manual), aplique o mesmo Secret na mao:
+
+```bash
+kubectl create secret generic backstage-dev-secrets \
+  -n backstage-dev \
+  --from-literal=K8S_SERVICE_ACCOUNT_TOKEN="$(kubectl create token backstage -n default --duration=8760h)" \
+  --from-literal=K8S_CA_DATA="$(kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}')" \
+  --from-literal=GITHUB_TOKEN="<fine-grained token do GitHub>" \
+  --from-literal=AUTH_GITHUB_CLIENT_ID="<client id do OAuth App>" \
+  --from-literal=AUTH_GITHUB_CLIENT_SECRET="<client secret do OAuth App>" \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl rollout restart deployment/backstage-dev-backend -n backstage-dev
+```
+
 ### Padrao por ambiente (dev, hml, prod)
 
 Arquivos de override criados:
@@ -186,5 +224,9 @@ Secrets necessarios no GitHub:
 - `NEXUS_USERNAME`
 - `NEXUS_PASSWORD`
 - `KUBECONFIG_B64` (kubeconfig em base64)
+- `K8S_SERVICE_ACCOUNT_TOKEN`, `K8S_CA_DATA`, `BACKSTAGE_GITHUB_TOKEN`,
+  `AUTH_GITHUB_CLIENT_ID`, `AUTH_GITHUB_CLIENT_SECRET` (ver secao "Secret do
+  backend" acima — usados pelo job `argocd_sync` para montar o Secret do
+  backend do Backstage)
 
-Importante: crie os Environments no GitHub (`dev`, `hml`, `prod`) e configure o `KUBECONFIG_B64` em cada um, caso use clusters diferentes por ambiente.
+Importante: crie os Environments no GitHub (`dev`, `hml`, `prod`) e configure todos os secrets acima em cada um, caso use clusters/credenciais diferentes por ambiente.
