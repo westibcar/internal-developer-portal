@@ -12,6 +12,8 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ include "backstage.fullname" . }}-backend
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/backstage-configmap.yaml") . | sha256sum }}
     spec:
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
