@@ -7,15 +7,11 @@ secrets:
   existingSecret: backstage-secrets
 
 global:
-  baseUrl: https://developer-portal.uday.corp
+  baseUrl: http://developer-portal.uday.corp
 
 istio:
   enabled: true
   host: developer-portal.uday.corp
-  gateway:
-    tls:
-      enabled: true
-      credentialName: developer-portal-uday-corp-tls
 
 postgres:
   auth:
