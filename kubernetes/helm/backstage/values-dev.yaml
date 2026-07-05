@@ -1,11 +1,9 @@
 imagePullSecrets:
   - name: registry-credentials
 fullnameOverride: backstage-dev
-
 kubernetes:
   clusterName: local-cluster
   clusterUrl: https://192.168.1.200:6443
-
 # Preencha os valores abaixo com as credenciais reais antes de aplicar.
 # Token: kubectl create token backstage -n default --duration=8760h
 # CA:    kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[].cluster.certificate-authority-data}'
@@ -29,9 +27,9 @@ postgres:
     storageClassName: longhorn
 backend:
   image:
-    tag: v0.0.2
+    tag: v0.0.3
 frontend:
   image:
-    tag: v0.0.2
+    tag: v0.0.3
   nodeSelector:
     kubernetes.io/hostname: worker01
