@@ -24,9 +24,9 @@ postgres:
     storageClassName: longhorn
 backend:
   image:
-    tag: v0.0.3
+    tag: v0.0.4
 frontend:
   image:
-    tag: v0.0.3
+    tag: v0.0.4
   nodeSelector:
     kubernetes.io/hostname: worker01
