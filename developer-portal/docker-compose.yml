@@ -23,7 +23,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     command: >
       bash -lc "
-      if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then yarn install; fi &&
+      yarn install;
+      npm rebuild better-sqlite3 --prefix /app;
       socat TCP-LISTEN:3001,fork,reuseaddr TCP6:[::1]:3000 &
       yarn workspace backend start &
       exec yarn workspace app start --host 0.0.0.0 --port 3000

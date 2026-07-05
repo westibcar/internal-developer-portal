@@ -1,0 +1,44 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform
+  description: Platform Engineering
+spec:
+  type: PLATFORM
+  profile:
+    displayName: PLATFORM
+    email: platform@uday.com.br
+    picture: https://api.dicebear.com/7.x/identicon/svg?seed=Abby&backgroundType=solid,gradientLinear&backgroundColor=ffd5dc,b6e3f4
+  children: [devops, sre]
+
+---
+
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: devops
+  description: Development and Operations
+spec:
+  type: DEVOPS
+  profile:
+    displayName: DEVOPS
+    email: devops@uday.com.br
+    picture: https://api.dicebear.com/7.x/identicon/svg?seed=Abby&backgroundType=solid,gradientLinear&backgroundColor=ffd5dc,b6e3f4
+  parent: platform
+  children: []
+
+---
+
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: sre
+  description: Site Reliability Engineering
+spec:
+  type: SRE
+  profile:
+    displayName: SRE
+    email: sre@uday.com.br
+    picture: https://api.dicebear.com/7.x/identicon/svg?seed=Abby&backgroundType=solid,gradientLinear&backgroundColor=ffd5dc,b6e3f4
+  parent: platform
+  children: []
