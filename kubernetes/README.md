@@ -137,6 +137,25 @@ kubectl create secret generic backstage-dev-secrets \
 kubectl rollout restart deployment/backstage-dev-backend -n backstage-dev
 ```
 
+### Secret do Postgres em prod
+
+Assim como o secret do backend, `values-prod.yaml` usa `postgres.auth.existingSecret:
+backstage-postgres-secret` para nao ter senha em texto plano no Git. O pipeline
+(step "Apply postgres secret (prod)", so roda para `environment: prod`) garante
+esse Secret a partir do GitHub Actions secret `POSTGRES_PASSWORD_PROD`.
+
+Importante: o Postgres so aplica `POSTGRES_PASSWORD` na **primeira** inicializacao
+do banco (volume vazio). Se `POSTGRES_PASSWORD_PROD` for alterado depois que o
+Postgres ja rodou uma vez, o Secret do Kubernetes muda mas a senha real dentro do
+banco **nao muda sozinha** — isso quebraria a conexao do backend. Para trocar a
+senha de verdade, faca o `ALTER USER` no Postgres e so depois atualize o secret do
+GitHub com o mesmo valor. Dev nao tem esse problema: `values-dev.yaml` usa senha
+em texto plano e o chart cria o Secret sozinho (aceitavel para ambiente nao
+produtivo).
+
+Em dev, o Postgres nao usa `existingSecret` — o proprio chart cria o secret com a
+senha de `values-dev.yaml` (`postgres.auth.password`).
+
 ### Padrao por ambiente (dev, hml, prod)
 
 Arquivos de override criados:
@@ -233,5 +252,40 @@ Secrets necessarios no GitHub:
   `AUTH_GITHUB_CLIENT_ID_PROD`, `AUTH_GITHUB_CLIENT_SECRET_PROD` (ver secao
   "Secret do backend" acima — usados pelo job `argocd_sync` para montar o
   Secret do backend do Backstage)
+- `POSTGRES_PASSWORD_PROD` (ver secao "Secret do Postgres em prod" acima)
 
 Importante: crie os Environments no GitHub (`dev`, `hml`, `prod`) e configure todos os secrets acima em cada um, caso use clusters/credenciais diferentes por ambiente.
+
+## Recriar tudo do zero (checklist)
+
+Se o cluster for recriado ou as Applications do ArgoCD forem deletadas, o que
+esta neste repositorio (Helm chart, workflows, Applications do ArgoCD) volta
+sozinho via GitOps/CI. O que **nao** volta sozinho, porque vive fora do
+cluster e do Git:
+
+1. **GitHub Actions secrets** (`Settings > Secrets and variables > Actions`) —
+   ja listados acima. Sobrevivem a recriacao do cluster (ficam no GitHub), so
+   precisam ser recriados se o **repositorio** for recriado.
+2. **OAuth Apps do GitHub** (`https://github.com/settings/developers`) — um
+   para dev, um para prod, cada um com sua Authorization callback URL. Tambem
+   sobrevivem a recriacao do cluster.
+3. **Bootstrap do ArgoCD** (uma vez por cluster novo):
+
+   ```bash
+   kubectl apply -f argocd/app-of-apps/root/application-developer-portal.yaml -n argocd
+   ```
+
+   Isso cria a Application `developer-portal`, que por sua vez cria/gerencia o
+   `AppProject backstage` e as Applications `backstage-dev`/`backstage-prod`
+   via GitOps — nao precisa mais aplicar `project-backstage.yaml` a parte.
+4. Os secrets `backstage-dev-secrets`, `backstage-secrets` (backend) e
+   `backstage-postgres-secret` (Postgres de prod) sao recriados automaticamente
+   pelo pipeline de CD na primeira execucao apos o bootstrap (nao precisa
+   aplicar nada manualmente). O Postgres de dev tambem se recria sozinho (senha
+   vem do `values-dev.yaml`).
+5. Namespaces (`backstage-dev`, `backstage`) sao criados automaticamente pelo
+   ArgoCD (`CreateNamespace=true`).
+
+Ou seja: depois de um cluster novo, o unico comando manual necessario e o do
+passo 3 — o resto (`git push`/release) aciona o pipeline e ele termina de
+montar tudo.
