@@ -160,11 +160,15 @@ jobs:
               NAMESPACE='backstage-dev'
               SECRET_NAME='backstage-dev-secrets'
               BACKEND_DEPLOYMENT='backstage-dev-backend'
+              AUTH_CLIENT_ID="${{ secrets.AUTH_GITHUB_CLIENT_ID_DEV }}"
+              AUTH_CLIENT_SECRET="${{ secrets.AUTH_GITHUB_CLIENT_SECRET_DEV }}"
               ;;
             prod)
               NAMESPACE='backstage'
               SECRET_NAME='backstage-secrets'
               BACKEND_DEPLOYMENT='backstage-backend'
+              AUTH_CLIENT_ID="${{ secrets.AUTH_GITHUB_CLIENT_ID_PROD }}"
+              AUTH_CLIENT_SECRET="${{ secrets.AUTH_GITHUB_CLIENT_SECRET_PROD }}"
               ;;
             *)
               echo "Unknown environment: ${{ inputs.environment }}"; exit 1
@@ -181,8 +185,8 @@ jobs:
             --from-literal=K8S_SERVICE_ACCOUNT_TOKEN="${{ secrets.K8S_SERVICE_ACCOUNT_TOKEN }}" \
             --from-literal=K8S_CA_DATA="${{ secrets.K8S_CA_DATA }}" \
             --from-literal=GITHUB_TOKEN="${{ secrets.BACKSTAGE_GITHUB_TOKEN }}" \
-            --from-literal=AUTH_GITHUB_CLIENT_ID="${{ secrets.AUTH_GITHUB_CLIENT_ID }}" \
-            --from-literal=AUTH_GITHUB_CLIENT_SECRET="${{ secrets.AUTH_GITHUB_CLIENT_SECRET }}" \
+            --from-literal=AUTH_GITHUB_CLIENT_ID="$AUTH_CLIENT_ID" \
+            --from-literal=AUTH_GITHUB_CLIENT_SECRET="$AUTH_CLIENT_SECRET" \
             --dry-run=client -o yaml | kubectl apply -f - | grep -v unchanged \
             && kubectl rollout restart "deployment/$BACKEND_DEPLOYMENT" -n "$NAMESPACE" || true
 

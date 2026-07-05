@@ -101,19 +101,23 @@ O chart nunca deve receber credenciais reais via `values-*.yaml`. Em vez disso,
 `secrets.existingSecret: <nome>` ja esta configurado em `values-dev.yaml` e
 `values-prod.yaml`, e o proprio pipeline de CD (`.github/workflows/cd.yaml`,
 job `argocd_sync`, step "Apply backend secret") cria/atualiza esse Secret a
-cada deploy, lendo os valores dos GitHub Environment secrets (`dev` e `prod`):
+cada deploy, lendo os valores dos GitHub Actions secrets (nivel repositorio):
+
+Compartilhados entre dev e prod (mesmo cluster):
 
 - `K8S_SERVICE_ACCOUNT_TOKEN`
 - `K8S_CA_DATA`
 - `BACKSTAGE_GITHUB_TOKEN` (fine-grained token do GitHub)
-- `AUTH_GITHUB_CLIENT_ID` (OAuth App do GitHub, usado no login)
-- `AUTH_GITHUB_CLIENT_SECRET`
 
-Cadastre esses 5 valores em **Settings > Environments > dev/prod > Secrets** no
-GitHub (valores diferentes por ambiente, mesmo nome). O pipeline aplica o
-Secret via `kubectl create secret ... --dry-run=client -o yaml | kubectl apply -f -`
-e reinicia o `Deployment` do backend automaticamente **somente quando algum
-valor muda** (pods so leem env vars na inicializacao).
+Por ambiente (cada um com seu proprio OAuth App no GitHub, porque um OAuth App
+classico so aceita uma unica Authorization callback URL):
+
+- `AUTH_GITHUB_CLIENT_ID_DEV` / `AUTH_GITHUB_CLIENT_SECRET_DEV`
+- `AUTH_GITHUB_CLIENT_ID_PROD` / `AUTH_GITHUB_CLIENT_SECRET_PROD`
+
+O pipeline aplica o Secret via `kubectl create secret ... --dry-run=client -o yaml
+| kubectl apply -f -` e reinicia o `Deployment` do backend automaticamente
+**somente quando algum valor muda** (pods so leem env vars na inicializacao).
 
 Quando `secrets.existingSecret` esta preenchido, o chart **nao** cria nem gerencia
 esse Secret (ver `templates/backstage-secrets.yaml`), entao nada sensivel entra no
@@ -225,8 +229,9 @@ Secrets necessarios no GitHub:
 - `NEXUS_PASSWORD`
 - `KUBECONFIG_B64` (kubeconfig em base64)
 - `K8S_SERVICE_ACCOUNT_TOKEN`, `K8S_CA_DATA`, `BACKSTAGE_GITHUB_TOKEN`,
-  `AUTH_GITHUB_CLIENT_ID`, `AUTH_GITHUB_CLIENT_SECRET` (ver secao "Secret do
-  backend" acima — usados pelo job `argocd_sync` para montar o Secret do
-  backend do Backstage)
+  `AUTH_GITHUB_CLIENT_ID_DEV`, `AUTH_GITHUB_CLIENT_SECRET_DEV`,
+  `AUTH_GITHUB_CLIENT_ID_PROD`, `AUTH_GITHUB_CLIENT_SECRET_PROD` (ver secao
+  "Secret do backend" acima — usados pelo job `argocd_sync` para montar o
+  Secret do backend do Backstage)
 
 Importante: crie os Environments no GitHub (`dev`, `hml`, `prod`) e configure todos os secrets acima em cada um, caso use clusters/credenciais diferentes por ambiente.
