@@ -22,6 +22,13 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: backstage-dev
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jqPathExpressions:
+        - .spec.volumeClaimTemplates[].status
+        - .spec.volumeClaimTemplates[].apiVersion
+        - .spec.volumeClaimTemplates[].kind
   syncPolicy:
     automated:
       prune: true
